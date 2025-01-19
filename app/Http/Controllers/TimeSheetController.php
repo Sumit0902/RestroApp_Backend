@@ -101,21 +101,39 @@ class TimeSheetController extends Controller
     {
         $request->validate([
             'company_id' => 'required|exists:companies,id',
-            'user_id' => 'required|exists:users,id',
+            'employee_id' => 'required|exists:users,id',
         ]);
 
-        $timesheet = TimeSheet::where('company_id', $request->company_id)
-            ->where('user_id', $request->user_id)
-            ->whereNull('check_out')
-            ->latest('check_in')
-            ->firstOrFail();
+        $employeeId = $request->employee_id;
+        $companyId = $request->company_id;
 
-        $timesheet->update(['check_out' => now()]);
-
-        return response()->json([
-            'success' => true,
-            'timesheet' => $timesheet,
-        ]);
+        try {
+            $timesheet = TimeSheet::where('company_id', $companyId)
+                ->where('user_id', $employeeId)
+                ->whereNull('check_out')
+                ->whereDate('check_in', '=', now()->toDateString())
+                ->latest('check_in')
+                ->first();
+    
+            if(!$timesheet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Check-out for today already exists.',
+                ], 400); // Bad Request
+            }
+            $timesheet->update(['check_out' => now()]);
+    
+            return response()->json([
+                'success' => true,
+                'timesheet' => $timesheet,
+            ],201);
+            //code...
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'message' => $th->getMessage(),
+            ], 400); // Bad Requestw
+        }
     }
 
     // Remove check-out from a timesheet (reset check-out)
