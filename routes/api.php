@@ -1,6 +1,7 @@
 <?php
 
 // use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TimeSheetController;
 use App\Http\Controllers\ShiftController;
@@ -51,6 +52,17 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::patch('{scheduleId}/update', [ScheduleController::class, 'update'])->name('companies.schedules.update');
             Route::delete('{scheduleId}/delete', [ScheduleController::class, 'destroy'])->name('companies.schedules.delete');
         });
+
+
+        Route::group(['prefix' => '{companyId}/emp_notificataions'], function () {
+            Route::get('{employeeId}', [NotificationController::class, 'getUserNotifications'])->name('companies.user_notificataions'); 
+        });
+        Route::group(['prefix' => '{companyId}/mgr_notificataions'], function () {
+            Route::get('{employeeId}', [NotificationController::class, 'getManagerNotifications'])->name('companies.mgr_notificataions'); 
+        });
+
+        Route::post('notification/{notifId}/mark_read', [NotificationController::class, 'markAsRead'])->name('companies.markAsRead'); 
+
 
 
         Route::group(['prefix' => '{companyId}/tasks'], function () {

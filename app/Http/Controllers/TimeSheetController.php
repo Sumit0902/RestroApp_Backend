@@ -5,9 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\TimeSheet;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-
+use App\Events\UserCheckIn;
 class TimeSheetController extends Controller
 {
     // List all timesheet entries for a company and an employee
@@ -58,7 +59,7 @@ class TimeSheetController extends Controller
     {
         $employeeId = $request->employee_id;
         $companyId = $request->company_id;
-         
+        $user = User::where('id', $employeeId)->first();
         // Get today's date in 'Y-m-d' format
         $today = now()->format('Y-m-d');
     
@@ -81,7 +82,12 @@ class TimeSheetController extends Controller
                 'user_id' => $employeeId,
                 'check_in' => now(),
             ]);
-        
+
+            $currentTime = now()->format('h:iA');
+            $message = "{$user->firstname} {$user->firstname} just checked in @ {$currentTime}";
+            
+            NotificationService::createNotification($message, $employeeId, null, $companyId );
+            
             return response()->json([
                 'success' => true,
                 'message' => 'Check-in created successfully.',
