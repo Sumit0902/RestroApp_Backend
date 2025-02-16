@@ -1,6 +1,7 @@
 <?php
 
 // use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TimeSheetController;
@@ -83,6 +84,17 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::get('/{id}', [TimeSheetController::class, 'show']); // Fetch single entry
         });
 
+
+        Route::group(['prefix' => '{companyId}/leave-management'], function () {
+            Route::get('/', [LeaveController::class, 'index']);
+            Route::get('myleaves/{employeeId}', [LeaveController::class, 'UserLeaves']);
+            Route::post('myleaves/{employeeId}/request', [LeaveController::class, 'store']);
+            Route::get('{leave_id}', [LeaveController::class, 'show']);
+            Route::put('{leave_id}/approve', [LeaveController::class, 'approve']);
+            Route::put('{leave_id}/reject', [LeaveController::class, 'reject']);
+            Route::put('{leave_id}/cancel', [LeaveController::class, 'cancel']);
+            Route::delete('{leave_id}/delete', [LeaveController::class, 'destroy']);
+        });
      
       
     
