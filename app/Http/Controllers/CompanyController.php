@@ -35,14 +35,7 @@ class CompanyController extends Controller
      */
     public function store(Request $request)
     {   
-        // dd($request);
-        // $user = $request
         try {
-            // $company = $request->all();
-            // $company['file'] = $request->file('logo');
-            // $company['files'] = $request->files->all();
-            
-
             $companyData = $request->except('logo'); // Get all the data except the logo
             $companyData['logo'] = null;
             if ($request->hasFile('logo')) {
@@ -67,11 +60,8 @@ class CompanyController extends Controller
                     ], 400);
                 }
     
-                // Generate a random 12-character string
                 $randomString = substr(str_shuffle('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 12);
-                // Create the new filename
                 $filename = 'logo_' . $randomString . '.' . $extension;
-                // Store the file in the public disk
                 $logoPath = $file->storeAs('', $filename, 'public');
                 $companyData['logo'] = $logoPath; // Add the logo path to the company data
             }

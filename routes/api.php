@@ -1,6 +1,7 @@
 <?php
 
 // use App\Http\Controllers\DepartmentController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TaskController;
@@ -37,7 +38,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
         Route::post('add', [CompanyController::class, 'store'])->name('companies.create');
         Route::post('{companyId}/update', [CompanyController::class, 'update'])->name('companies.update');
         Route::get('{companyId}', [CompanyController::class, 'show'])->name('companies.show');
-        Route::get('{companyId}/employees', [CompanyController::class, 'companyEmployees'])->name('companies.employees.index');
+        // Route::get('{companyId}/employees', [CompanyController::class, 'companyEmployees'])->name('companies.employees.index');
         // Route::get('{companyId}/departments', [DepartmentController::class, 'index'])->name('companies.departments.index');
         Route::group(['prefix' => '{companyId}/shifts'], function () {
             Route::get('/', [ShiftController::class, 'index'])->name('companies.shifts.index');
@@ -52,6 +53,15 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::get('{scheduleId}', [ScheduleController::class, 'getSchedule'])->name('companies.schedules.show');
             Route::patch('{scheduleId}/update', [ScheduleController::class, 'update'])->name('companies.schedules.update');
             Route::delete('{scheduleId}/delete', [ScheduleController::class, 'destroy'])->name('companies.schedules.delete');
+        });
+
+
+        Route::group(['prefix' => '{companyId}/employees'], function () {
+            Route::get('/', [EmployeeController::class, 'index'])->name('companies.employees.index');
+            Route::post('add', [EmployeeController::class, 'store'])->name('companies.employees.create');
+            Route::get('{employeeId}', [EmployeeController::class, 'show'])->name('companies.employees.show');
+            Route::patch('{employeeId}/update', [EmployeeController::class, 'update'])->name('companies.employees.update');
+            Route::delete('{employeeId}/delete', [EmployeeController::class, 'destroy'])->name('companies.employees.delete');
         });
 
 

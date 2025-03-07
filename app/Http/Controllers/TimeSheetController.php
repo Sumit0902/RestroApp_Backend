@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\TimeSheet;
 use App\Models\User;
 use App\Services\NotificationService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Events\UserCheckIn;
+use Illuminate\Support\Facades\DB;
 class TimeSheetController extends Controller
 {
     // List all timesheet entries for a company and an employee
@@ -19,38 +21,49 @@ class TimeSheetController extends Controller
         
         [$year, $month] = explode('-', $month);
         if ($companyId != null) {
+
+            $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
+            $endOfMonth = $startOfMonth->copy()->endOfMonth();
+            
             $timesheets = TimeSheet::where('company_id', $companyId)
                 ->whereYear('created_at', $year)
                 ->whereMonth('created_at', $month)
                 ->orderBy('check_in', 'asc')
                 ->with('user')
                 ->get();
+
+            
+            $users = User::select('*')->where('company_id', $companyId)->get();
     
-            $timesheetsData = $timesheets->groupBy('user_id')->map(function ($timesheets, $userId) {
-                $user = $timesheets->first()->user;
-                $attendanceDays = $timesheets->mapWithKeys(function ($timesheet) {
+            $attendanceRaw = TimeSheet::where('company_id', $companyId)
+                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->whereIn('user_id', $users->pluck('id'))
+                ->get(['user_id',  'check_in', 'check_out']);
+
+
+                $attendanceByUser = [];
+                foreach ($attendanceRaw as $record) {
+                    $date = Carbon::parse($record->date)->toDateString(); // Use 'date' column, not 'created_at'
+                    $attendanceByUser[$record->user_id][$date] = [
+                        'check_in' => $record->check_in ? Carbon::parse($record->check_in)->toTimeString() : null,
+                        'check_out' => $record->check_out ? Carbon::parse($record->check_out)->toTimeString() : null,
+                    ];
+                }
+        
+                // Build the response
+                $timesheets = $users->map(function ($user) use ($attendanceByUser) {
                     return [
-                        $timesheet->created_at->format('Y-m-d') => [
-                            'checkin' => $timesheet->check_in,
-                            'checkout' => $timesheet->check_out
-                        ]
+                        'user' =>  $user,
+                        'attendance' => $attendanceByUser[$user->id] ?? [],
                     ];
                 });
-    
-                return [
-                    'user' => [
-                        'id' => $user->id,
-                        'name' => $user->firstname.' '.$user->lastname
-                    ],
-                    'attendance_days' => $attendanceDays
-                ];
-            })->values();
+        
         } 
 
 
         return response()->json([
             'success' => true,
-            'timesheets' => $timesheetsData,
+            'timesheets' => $timesheets,
         ]);
     }
 
