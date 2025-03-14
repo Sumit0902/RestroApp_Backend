@@ -4,6 +4,7 @@
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PayrollController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TimeSheetController;
 use App\Http\Controllers\ShiftController;
@@ -106,7 +107,16 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::delete('{leave_id}/delete', [LeaveController::class, 'destroy']);
         });
      
-      
+        Route::group(['prefix' => '{companyId}/payroll'], function () {
+            Route::post('/', [PayrollController::class, 'index']); // List entries
+            Route::post('/generate/{employeeId}', [PayrollController::class, 'generatePayroll']); // Fetch single entry
+            // Route::post('/mytimesheet/{employeeId}', [TimeSheetController::class, 'getTimesheetForEmployee']); // List entries
+            // Route::post('/check-in', [TimeSheetController::class, 'checkIn']); // Check-in
+            // Route::post('/check-out', [TimeSheetController::class, 'checkOut']); // Check-out
+            // Route::post('/reset-check-out/{id}', [TimeSheetController::class, 'resetCheckOut']); // Reset check-out
+            // Route::get('/{id}', [TimeSheetController::class, 'show']); // Fetch single entry
+        });
+
     
     });
 

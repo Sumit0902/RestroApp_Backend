@@ -20,8 +20,7 @@ return new class extends Migration
             $table->string('password');
             $table->enum('role', ['employee', 'manager', 'superadmin']);
             $table->string('phone')->nullable();
-            $table->bigInteger('company_id')->nullable();
-            // $table->bigInteger('department_id')->nullable();
+            $table->bigInteger('company_id')->nullable(); 
             $table->string('company_role')->nullable();
             $table->string('wage')->nullable();
             $table->string('wage_rate')->nullable();

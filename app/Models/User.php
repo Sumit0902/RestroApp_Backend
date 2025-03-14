@@ -67,7 +67,7 @@ class User extends Authenticatable
      * Calculate total hours worked in a given month.
      *
      * @param string $month Format: 'YYYY-MM'
-     * @return float
+     * @return array
      */
     public function hoursWorked($month)
     {
@@ -75,19 +75,74 @@ class User extends Authenticatable
 
         $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
         $endOfMonth = $startOfMonth->copy()->endOfMonth();
+        $today = Carbon::today();
+        
+        if ($startOfMonth->isSameMonth($today)) {
+            $endOfMonth = $today;
+        }
+        $company = $this->company;
 
-        $timesheets = TimeSheet::where('user_id', $this->id)
+        $timesheets = TimeSheet::where('company_id', $company->id)->where('user_id', $this->id)
             ->whereBetween('check_in', [$startOfMonth, $endOfMonth])
             ->get();
 
-        $totalHours = 0;
+        $leaves = Leave::where('user_id', $this->id)
+            ->whereBetween('start_date', [$startOfMonth, $endOfMonth])
+            ->orWhereBetween('end_date', [$startOfMonth, $endOfMonth])
+            ->get();
+        
+        $operationalDays = explode(',', $company->workingDays);
 
-        foreach ($timesheets as $timesheet) {
-            if ($timesheet->check_in && $timesheet->check_out) {
-                $totalHours += $timesheet->check_in->diffInHours($timesheet->check_out);
+       
+        $totalMinutes = 0;
+        $otMinutes = 0;
+        $holidays = 0;
+        $ddd = array();
+        for ($day = 1; $day <= $endOfMonth->day; $day++) {
+            $currentDate = Carbon::create($year, $month, $day);
+            $dayOfWeek = $currentDate->dayOfWeek;
+
+            if (!in_array((string) $dayOfWeek, $operationalDays)) {
+                  $ddd[$day] = [$dayOfWeek , $operationalDays];
+                continue; // Skip non-operational days
+            }
+
+            $timesheet = $timesheets && $timesheets->count() > 0 
+            ? $timesheets->firstWhere('check_in', '>=', $currentDate->startOfDay())
+            : null;
+        
+            if ($timesheet) {
+                $timesheet = $timesheet->firstWhere('check_out', '<=', $currentDate->endOfDay());
+            }
+            
+            $timesheet = $timesheet ?? false;
+
+            if ($timesheet) {
+                $checkIn = $timesheet->check_in;
+                $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8); // Assume 8 hours if no check-out
+
+                $minutesWorked = $checkIn->diffInMinutes($checkOut);
+                $totalMinutes += $minutesWorked;
+
+                if ($minutesWorked > 480) { // 8 hours in minutes
+                    $otMinutes += $minutesWorked - 480;
+                }
+                $ddd[$day] = $minutesWorked;
+            } else {
+                $leave = $leaves && $leaves->count() > 0 ? $leaves->firstWhere('start_date', '<=', $currentDate)
+                    ->firstWhere('end_date', '>=', $currentDate) : false;
+
+                if (!$leave) {
+                    $holidays++;
+                }
+                $ddd[$day] = $leave;
             }
         }
 
-        return $totalHours;
+        return [
+            'hoursWorked' => round($totalMinutes / 60, 2),
+            'otHours' => round($otMinutes / 60, 2),
+            'holidays' => $holidays,
+        ];
     }
 }
