@@ -13,7 +13,8 @@ class ScheduleController extends Controller
      */
     
 
-    public function index(Request $request) {
+    public function index(Request $request)
+    {
         $weekNumber = $request->week_number;
         $year = $request->year;
         $companyId = $request->company_id;
@@ -22,60 +23,44 @@ class ScheduleController extends Controller
             ->where('week_number', $weekNumber)
             ->where('year', $year)
             ->with(['user', 'shift'])
-            ->get()
-            ;
+            ->get();
 
-        $schedData = array();
+        $schedData = [];
 
-        if($schedules) {
-            foreach($schedules as $schedule) {
-                $schedData[$schedule->user_id] = array(
-                    'user' => $schedule->user->firstname.' '.$schedule->user->lastname,
-                    'shift' => [
+        if ($schedules) {
+            foreach ($schedules as $schedule) {
+                $userId = $schedule->user_id;
+
+                // If the user already exists in the array, append the shift and days_schedule
+                if (isset($schedData[$userId])) {
+                    $schedData[$userId]['shifts'][] = [
                         'name' => $schedule->shift->name,
                         'start_time' => $schedule->shift->start_time,
-                        'end_time' => $schedule->shift->end_time
-                    ],
-                    'notes' => $schedule->notes,
-                    'schedule' => $schedule->days_schedule,
-                    'scheduleId' => $schedule->id
-                );
+                        'end_time' => $schedule->shift->end_time,
+                        'date' => $schedule->days_schedule,
+                    ];
+                } else {
+                    // Create a new entry for the user
+                    $schedData[$userId] = [
+                        'userid' => $schedule->user->id,
+                        'user' => $schedule->user->firstname . ' ' . $schedule->user->lastname,
+                        'shifts' => [[
+                            'name' => $schedule->shift->name,
+                            'start_time' => $schedule->shift->start_time,
+                            'end_time' => $schedule->shift->end_time,
+                            'date' => $schedule->days_schedule,
+                        ]],
+                        'notes' => $schedule->notes,
+                    ];
+                }
             }
         }
 
-
-
-            // $groupedSchedules = $schedules->groupBy('user_id')->map(function ($userSchedules) {
-            //     $user = $userSchedules->first()->user;
-            
-            //     return [
-            //         'user' => [
-            //             'id' => $user->id,
-            //             'firstname' => $user->firstname,
-            //             'lastname' => $user->lastname,
-            //         ],
-            //         'schedules' => $userSchedules->map(function ($schedule) {
-            //             $shift = $schedule->shift; // Assuming shift relationship exists
-            //             return [
-            //                 'day' => $schedule->days_schedule,
-            //                 'schedule_id' => $schedule->id,
-            //                 'shift' => [
-            //                     'name' => $shift->name,
-            //                     'start_time' => $shift->start_time,
-            //                     'end_time' => $shift->end_time,
-            //                 ],
-            //             ];
-            //         })->toArray(),
-            //     ];
-            // });
-
         return response()->json([
-            'success' => true, 
-            'data' => $schedData,   
+            'success' => true,
+            'data' => $schedData,
             'error' => null,
         ]);
-
-      
     }
 
     /**
@@ -88,75 +73,55 @@ class ScheduleController extends Controller
             'company_id' => 'required|exists:companies,id',
             'shift' => 'required|exists:shifts,id',
             'notes' => 'nullable|string',
-            'week_number' => 'nullable|integer',
             'selectedDays' => 'required|array',
             'selectedDays.*' => 'date',
         ]);
-    
+
         try {
             $employeeId = $validatedData['employee'];
             $companyId = $validatedData['company_id'];
             $shiftId = $validatedData['shift'];
             $notes = $validatedData['notes'];
             $selectedDays = $validatedData['selectedDays'];
-            $week_number = $validatedData['week_number'];
-    
-            // Initialize a schedule array to organize days by week and year
-            $weeklySchedule = [];
-    
+
             foreach ($selectedDays as $date) {
                 $carbonDate = Carbon::parse($date);
-                $weekNumber = $carbonDate->isoWeek(); // Get ISO week number
-                $year = $carbonDate->year; // Get year
-            
-                // Use Carbon's dayOfWeek property for numeric keys (Monday = 0, Sunday = 6)
-                $dayOfWeek = $carbonDate->dayOfWeekIso - 1; // Monday = 0, Tuesday = 1, ..., Sunday = 6
-            
-                // Add the day to the corresponding week and year
-                $weeklySchedule[$year][$weekNumber][$dayOfWeek] = $shiftId;
-            }
-    
-            // Insert or update schedules for each week and year
-            foreach ($weeklySchedule as $year => $weeks) {
-                foreach ($weeks as $weekNumber => $daysSchedule) {
-                    // Check if a schedule already exists for this user, company, year, and week
-                    $existingSchedule = Schedule::where('user_id', $employeeId)
-                        ->where('company_id', $companyId)
-                        ->where('year', $year)
-                        ->where('week_number', $weekNumber)
-                        ->first();
-    
-                    if ($existingSchedule) {
-                        // Update the existing schedule
-                        $existingSchedule->update([
-                            'days_schedule' => json_encode($daysSchedule),
-                            'notes' => $notes,
-                        ]);
-                    } else {
-                        // Create a new schedule
-                        Schedule::create([
-                            'user_id' => $employeeId,
-                            'company_id' => $companyId,
-                            'shift_id' => $shiftId,
-                            'week_number' => $weekNumber,
-                            'year' => $year,
-                            'days_schedule' => json_encode($daysSchedule),
-                            'notes' => $notes,
-                        ]);
-                    }
+                $year = $carbonDate->year;
+                $weekNumber = $carbonDate->isoWeek();
+
+                // Check if a schedule already exists for this user, company, and date
+                $existingSchedule = Schedule::where('user_id', $employeeId)
+                    ->where('company_id', $companyId)
+                    ->where('year', $year)
+                    ->where('week_number', $weekNumber)
+                    ->where('days_schedule', $carbonDate->toDateString())
+                    ->first();
+
+                if (!$existingSchedule) {
+                    // Create a new schedule for the specific day
+                    Schedule::create([
+                        'user_id' => $employeeId,
+                        'company_id' => $companyId,
+                        'shift_id' => $shiftId,
+                        'week_number' => $weekNumber,
+                        'year' => $year,
+                        'days_schedule' => $carbonDate->toDateString(), // Store only the date as text
+                        'notes' => $notes,
+                    ]);
                 }
             }
-    
+
             return response()->json([
                 'success' => true,
-                'data' => 'Schedules created/updated successfully',
+                'data' => 'Schedules created successfully for new dates.',
                 'error' => null,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
                 'data' => null,
-                'error' => $th->getMessage(), 
+                'error' => $th->getMessage(),
+                'errorf' => $th,
             ], 400);
         }
     }
@@ -167,13 +132,13 @@ class ScheduleController extends Controller
     {
         $scheduleId = $request->query('scheduleId'); 
 
-        return response()->json([
-            'success' => false,
-            'data' => $scheduleId, 
-        ], 201);
+        // return response()->json([
+        //     'success' => false,
+        //     'data' => $scheduleId, 
+        // ], 201);
 
         try {
-            $schedule = Schedule::with(['user', 'shift'])->findOrFail($id);
+            $schedule = Schedule::with(['user', 'shift'])->findOrFail($scheduleId);
 
             return response()->json([
                 'success' => true,
@@ -226,6 +191,62 @@ class ScheduleController extends Controller
             return response()->json(['error' => 'Schedule or Company not found'], 404);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to fetch schedule data'.$e->getMessage()], 500);
+        }
+    }
+    public function getEmployeeSchedule(Request $request)
+    {
+        try {
+            $weekNumber = $request->week_number;
+            $year = $request->year;
+            $companyId = $request->company_id;
+            $employeeId = $request->employee_id;
+    
+            $schedules = Schedule::where('company_id', $companyId)
+                ->where('week_number', $weekNumber)
+                ->where('year', $year)
+                ->where('user_id', $employeeId)
+                ->with(['user', 'shift'])
+                ->get();
+    
+            $schedData = [];
+    
+            if ($schedules) {
+                foreach ($schedules as $schedule) {
+                    $userId = $schedule->user_id;
+
+                    if (isset($schedData[$userId])) {
+                        $schedData[$userId]['shifts'][] = [
+                            'name' => $schedule->shift->name,
+                            'start_time' => $schedule->shift->start_time,
+                            'end_time' => $schedule->shift->end_time,
+                            'date' => $schedule->days_schedule,
+                        ];
+                    } else {
+                        // Create a new entry for the user
+                        $schedData[$userId] = [
+                            'userid' => $schedule->user->id,
+                            'user' => $schedule->user->firstname . ' ' . $schedule->user->lastname,
+                            'shifts' => [[
+                                'name' => $schedule->shift->name,
+                                'start_time' => $schedule->shift->start_time,
+                                'end_time' => $schedule->shift->end_time,
+                                'date' => $schedule->days_schedule,
+                            ]],
+                            'notes' => $schedule->notes,
+                        ];
+                    }
+                }
+            }
+    
+            return response()->json([
+                'success' => true,
+                'data' => $schedData,
+                'error' => null,
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Schedule or Company not found'], 404);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to fetch schedule data'.$e->getMessage()], 400);
         }
     }
 

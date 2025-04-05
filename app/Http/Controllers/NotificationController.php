@@ -72,8 +72,6 @@ class NotificationController extends Controller
 
     public function getManagerNotifications($companyId, $employeeId) {
     
-
-        
         try {
             $notifications = Notification::whereNot('notifier_id', $employeeId)->where('company_id', $companyId)->orderBy('created_at','desc');
             $getn = $notifications->get();

@@ -8,18 +8,23 @@ use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request,  $companyId)
     {
-        $request->validate([
-            'company_id' => 'required|exists:companies,id',
-        ]);
-
-        $tasks = Task::where('company_id', $request->company_id)->get();
-
-        return response()->json([
-            'success' => true,
-            'tasks' => $tasks,
-        ]);
+       
+        try {
+            $tasks = Task::where('company_id', $companyId)->with('user')->get();
+    
+            return response()->json([
+                'success' => true,
+                'data' => $tasks,
+            ]);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => $th->getMessage(), 
+            ],400);
+        }
     }
 
     public function show(Request $request, $id)
@@ -38,19 +43,22 @@ class TaskController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, $companyId)
     {
         $validated = $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'company_id' => 'required|exists:companies,id',
+            'user_id' => 'required|exists:users,id', 
             'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'is_recurring' => 'required|boolean',
-            'weekdays' => 'nullable|array',
-            'weekdays.*' => 'integer|min:0|max:6',
+            'description' => 'nullable|string', 
+            'status' => 'nullable|string', 
         ]);
 
-        $task = Task::create($validated);
+        $task = Task::create(array(
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'status' => $validated['status'],
+            'user_id' => $validated['user_id'],
+            'company_id' => $companyId,
+        ));
 
         return response()->json([
             'success' => true,

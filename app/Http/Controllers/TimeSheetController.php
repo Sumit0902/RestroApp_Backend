@@ -18,54 +18,69 @@ class TimeSheetController extends Controller
     {
         $companyId = $request->companyId;
         $month = $request->month; 
-        
-        [$year, $month] = explode('-', $month);
-        if ($companyId != null) {
 
+        [$year, $month] = explode('-', $month);
+
+        if ($companyId) {
+            // Define month boundaries
             $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
             $endOfMonth = $startOfMonth->copy()->endOfMonth();
-            
-            $timesheets = TimeSheet::where('company_id', $companyId)
-                ->whereYear('created_at', $year)
-                ->whereMonth('created_at', $month)
-                ->orderBy('check_in', 'asc')
-                ->with('user')
-                ->get();
 
-            
-            $users = User::select('*')->where('company_id', $companyId)->get();
-    
+            // Fetch users of the company
+            $users = User::where('company_id', $companyId)->get();
+
+            // Fetch timesheets within the month range
             $attendanceRaw = TimeSheet::where('company_id', $companyId)
-                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->whereBetween('check_in', [$startOfMonth, $endOfMonth]) // Use check-in instead of created_at
                 ->whereIn('user_id', $users->pluck('id'))
-                ->get(['user_id',  'check_in', 'check_out']);
+                ->get(['user_id', 'check_in', 'check_out']);
 
+            // Organize attendance by user
+            $attendanceByUser = [];
+            foreach ($attendanceRaw as $record) {
+                $date = Carbon::parse($record->check_in)->toDateString(); // Convert check-in date to a string
 
-                $attendanceByUser = [];
-                foreach ($attendanceRaw as $record) {
-                    $date = Carbon::parse($record->date)->toDateString(); // Use 'date' column, not 'created_at'
-                    $attendanceByUser[$record->user_id][$date] = [
-                        'check_in' => $record->check_in ? Carbon::parse($record->check_in)->toTimeString() : null,
-                        'check_out' => $record->check_out ? Carbon::parse($record->check_out)->toTimeString() : null,
-                    ];
+                // Ensure array is initialized for the user
+                if (!isset($attendanceByUser[$record->user_id])) {
+                    $attendanceByUser[$record->user_id] = [];
                 }
-        
-                // Build the response
-                $timesheets = $users->map(function ($user) use ($attendanceByUser) {
-                    return [
-                        'user' =>  $user,
-                        'attendance' => $attendanceByUser[$user->id] ?? [],
-                    ];
-                });
-        
-        } 
 
+                // Assign check-in and check-out times
+                $attendanceByUser[$record->user_id][$date] = [
+                    'check_in' => $record->check_in ? Carbon::parse($record->check_in)->toTimeString() : null,
+                    'check_out' => $record->check_out ? Carbon::parse($record->check_out)->toTimeString() : null,
+                ];
+            }
+
+            // Format response data
+            $timesheets = $users->map(function ($user) use ($attendanceByUser) {
+                return [
+                    'user' => [
+                        'id' => $user->id,
+                        'firstname' => $user->firstname,
+                        'lastname' => $user->lastname,
+                        'role' => $user->role,
+                        'company_id' => $user->company_id,
+                        'wage' => $user->wage,
+                        'wage_rate' => $user->wage_rate,
+                        'avatar' => $user->avatar,
+                    ],
+                    'attendance' => $attendanceByUser[$user->id] ?? [],
+                ];
+            });
+        } else {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid company ID.',
+            ], 400);
+        }
 
         return response()->json([
             'success' => true,
             'timesheets' => $timesheets,
         ]);
     }
+
 
     // Check-in logic
     public function checkIn(Request $request)
@@ -191,34 +206,52 @@ class TimeSheetController extends Controller
         ]);
     }
 
-    public function getTimesheetForEmployee(Request $request){   
-        
-        $employeeId = $request->employeeId;
-        $companyId = $request->companyId;
-        $month = $request->month; // Format: 'YYYY-MM'
+    public function getTimesheetForEmployee(Request $request)
+    {
+        try {
+            $employeeId = Auth::user()->id;
 
-        // Ensure the authenticated user can only fetch their own timesheets
-        if (Auth::user()->id != intval($employeeId)) {
+            $companyId = $request->companyId;
+            $month = $request->month; // Format: 'YYYY-MM'
+
+            // Ensure the authenticated user can only fetch their own timesheets
+            if (Auth::user()->id != intval($employeeId)) {
+                return response()->json([
+                    'success' => false,
+                    'msg' => "You are not authorized to perform this action",
+                ], 403);
+            }
+
+            // Extract year and month
+            [$year, $month] = explode('-', $month);
+
+            // Retrieve all timesheets for the specified month and year
+            $timesheets = TimeSheet::where('company_id', $companyId)
+                ->where(function ($query) use ($year, $month) {
+                    $query->whereMonth('check_in', $month)
+                          ->whereYear('check_in', $year);
+                })
+                ->orWhere(function ($query) use ($year, $month) {
+                    $query->whereMonth('check_out', $month)
+                          ->whereYear('check_out', $year);
+                })
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'timesheets' => $timesheets,
+                'data' => [
+                    'employee_id' => $employeeId,
+                    'company_id' => $companyId,
+                    'month' => $month,
+                    'year' => $year,
+                ],
+            ], 200);
+        } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
-                'msg' => "You are not authorized to perform this action",
-            ], 403);
+                'error' => $th->getMessage(),
+            ], 400);
         }
-
-        // Extract year and month
-        [$year, $month] = explode('-', $month);
-
-        // Retrieve all timesheets for the specified month and year
-        $timesheets = TimeSheet::where('company_id', $companyId)
-            ->where('user_id', $employeeId)
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
-            ->orderBy('check_in', 'asc')
-            ->get();
-
-        return response()->json([
-            'success' => true,
-            'timesheets' => $timesheets,
-        ]);
     }
 }

@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-
+use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
+use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 class UserController extends Controller
 {
     //
@@ -13,19 +14,19 @@ class UserController extends Controller
     public function store(Request $request) {
 
      
-        // $validatedData = $request->validate([
-        //     'firstname' => 'required|string|max:255',
-        //     'lastname' => 'required|string|max:255',
-        //     'email' => 'required|email|unique:users,email',
-        //     'password' => 'required|string|min:8',
-        //     'phone' => 'nullable|string|max:15',
-        //     'role' => ['required', Rule::in(['employee', 'manager'])],
-        //     'company_id' => 'required|exists:companies,id',
-        //     'company_role' => 'nullable|string|max:255',
-        //     'wage' => 'nullable|numeric',
-        //     'wage_rate' => 'nullable|numeric',
-        //     'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validate avatar image
-        // ]);
+        $validatedData = $request->validate([
+            'firstname' => 'required|string|max:255',
+            'lastname' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'phone' => 'nullable|string|max:15',
+            'role' => ['required', Rule::in(['employee', 'manager'])],
+            'company_id' => 'required|exists:companies,id',
+            'company_role' => 'nullable|string|max:255',
+            'wage' => 'nullable|numeric',
+            'wage_rate' => 'nullable|numeric',
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048', // Validate avatar image
+        ]);
         try {
             $employeeData = $request->except('avatar');
             $employeeData['avatar'] = null;
@@ -85,6 +86,78 @@ class UserController extends Controller
                 'error' => $th->getMessage(), 
             ], 400);
         } 
+    }
+
+    public function enableTwoFactor(Request $request,$companyId, $employeeId){
+        // $user = $request->user();
+        try {
+            $user = User::find($employeeId);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => $th->getMessage(), 
+            ],400);
+        }
+
+        
+        app(EnableTwoFactorAuthentication::class)($user);
+
+        $qrCode = $user->twoFactorQrCodeSvg();
+
+        return response()->json([
+            'qr_code' => $qrCode,
+            'recovery_codes' => json_decode(decrypt($user->two_factor_recovery_codes), true),
+            'two_factor_secret' => $user->two_factor_secret, // Optional, for manual entry
+        ]);
+    }
+
+    public function confirmTwoFactor(Request $request,$companyId, $employeeId ) {
+        try {
+            $user = User::find($employeeId);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => $th->getMessage(), 
+            ],400);
+        }
+        
+        $request->validate([
+            'code' => 'required|string',
+        ]);
+
+        // $user = $request->user(); // Authenticated via Sanctum
+
+        if (!$user->two_factor_secret) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => '2FA not initialized', 
+            ],400);
+        }
+
+        // Verify the 2FA code
+        // $valid = app('two.factor')->verify(decrypt($user->two_factor_secret), $request->code);
+        $valid = app(TwoFactorAuthenticationProvider::class)->verify(decrypt($user->two_factor_secret), $request->code);
+        if (!$valid) { 
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => 'Invalid 2FA code', 
+            ],401);
+        }
+
+        // Mark 2FA as confirmed (Fortify handles this internally, but we ensure it persists)
+        $user->forceFill([
+            'two_factor_confirmed_at' => now(),
+        ])->save();
+
+        return response()->json([
+            'success' => false,
+            'data' => '2FA successfully enabled',
+            'error' => null, 
+        ],200);
     }
 
     public function show(Request $request)

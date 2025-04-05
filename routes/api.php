@@ -22,7 +22,8 @@ use App\Http\Controllers\AuthController;
 //     return $request->user();
 // })->middleware('auth:sanctum');
 
-Route::post('login',[AuthController::class,'login'])->name('companies.all');
+Route::post('login',[AuthController::class,'login'])->name('authlogin');
+Route::post('two-factor-challenge', [AuthController::class, 'verifyTwoFactor']);
 Route::post('logout',[AuthController::class,'logout'])
   ->middleware('auth:sanctum');
 
@@ -52,6 +53,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::post('/', [ScheduleController::class, 'index'])->name('companies.schedules.index');
             Route::post('add', [ScheduleController::class, 'store'])->name('companies.schedules.create');
             Route::get('{scheduleId}', [ScheduleController::class, 'getSchedule'])->name('companies.schedules.show');
+            Route::get('{employeeId}', [ScheduleController::class, 'getEmployeeSchedule'])->name('companies.schedules.employeeSchedule');
             Route::patch('{scheduleId}/update', [ScheduleController::class, 'update'])->name('companies.schedules.update');
             Route::delete('{scheduleId}/delete', [ScheduleController::class, 'destroy'])->name('companies.schedules.delete');
         });
@@ -62,23 +64,16 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::post('add', [EmployeeController::class, 'store'])->name('companies.employees.create');
             Route::get('{employeeId}', [EmployeeController::class, 'show'])->name('companies.employees.show');
             Route::patch('{employeeId}/update', [EmployeeController::class, 'update'])->name('companies.employees.update');
+            Route::post('{employeeId}/updateMyProfile', [EmployeeController::class, 'updateMyProfile'])->name('companies.employees.updateMyProfile');
+            Route::post('{employeeId}/enable-2fa', [UserController::class, 'enableTwoFactor'])->name('companies.employees.enable2fa');
+            Route::post('{employeeId}/confirm-2fa', [UserController::class, 'confirmTwoFactor'])->name('companies.employees.confirm2Fa');
             Route::delete('{employeeId}/delete', [EmployeeController::class, 'destroy'])->name('companies.employees.delete');
         });
 
 
-        Route::group(['prefix' => '{companyId}/emp_notificataions'], function () {
-            Route::get('{employeeId}', [NotificationController::class, 'getUserNotifications'])->name('companies.user_notificataions'); 
-        });
-        Route::group(['prefix' => '{companyId}/mgr_notificataions'], function () {
-            Route::get('{employeeId}', [NotificationController::class, 'getManagerNotifications'])->name('companies.mgr_notificataions'); 
-        });
-
-        Route::post('notification/{notifId}/mark_read', [NotificationController::class, 'markAsRead'])->name('companies.markAsRead'); 
-
-
 
         Route::group(['prefix' => '{companyId}/tasks'], function () {
-            Route::get('/', [TaskController::class, 'index']);
+            Route::get('/', [TaskController::class, 'index'])->name('companies.tasks.index');
             Route::post('/add', [TaskController::class, 'store']);
             Route::get('{taskid}', [TaskController::class, 'show']);
             Route::put('{taskid}/update', [TaskController::class, 'update']);
@@ -88,7 +83,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
      
         Route::group(['prefix' => '{companyId}/timesheets'], function () {
             Route::post('/', [TimeSheetController::class, 'index']); // List entries
-            Route::post('/mytimesheet/{employeeId}', [TimeSheetController::class, 'getTimesheetForEmployee']); // List entries
+            Route::post('/mytimesheet', [TimeSheetController::class, 'getTimesheetForEmployee']); // List entries
             Route::post('/check-in', [TimeSheetController::class, 'checkIn']); // Check-in
             Route::post('/check-out', [TimeSheetController::class, 'checkOut']); // Check-out
             Route::post('/reset-check-out/{id}', [TimeSheetController::class, 'resetCheckOut']); // Reset check-out
@@ -110,12 +105,24 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
         Route::group(['prefix' => '{companyId}/payroll'], function () {
             Route::post('/', [PayrollController::class, 'index']); // List entries
             Route::post('/generate/{employeeId}', [PayrollController::class, 'generatePayroll']); // Fetch single entry
-            // Route::post('/mytimesheet/{employeeId}', [TimeSheetController::class, 'getTimesheetForEmployee']); // List entries
+            Route::get('/{employeeId}', [PayrollController::class, 'payrollByUserId']); // Fetch single entry
             // Route::post('/check-in', [TimeSheetController::class, 'checkIn']); // Check-in
             // Route::post('/check-out', [TimeSheetController::class, 'checkOut']); // Check-out
             // Route::post('/reset-check-out/{id}', [TimeSheetController::class, 'resetCheckOut']); // Reset check-out
             // Route::get('/{id}', [TimeSheetController::class, 'show']); // Fetch single entry
         });
+
+        
+        Route::group(['prefix' => '{companyId}/emp_notificataions'], function () {
+            Route::get('{employeeId}', [NotificationController::class, 'getUserNotifications'])->name('companies.user_notificataions'); 
+        });
+        Route::group(['prefix' => '{companyId}/mgr_notificataions'], function () {
+            Route::get('{employeeId}', [NotificationController::class, 'getManagerNotifications'])->name('companies.mgr_notificataions'); 
+        });
+
+        Route::post('notification/{notifId}/mark_read', [NotificationController::class, 'markAsRead'])->name('companies.markAsRead'); 
+
+
 
     
     });
@@ -130,7 +137,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
     // Route::get('department/{department}', [DepartmentController::class, 'show'])->name('department.show');
     
     // Schedule routes with shifts
-    Route::resource('schedules', ScheduleController::class);
+    // Route::resource('schedules', ScheduleController::class);
     
     // Leave  routes for future 
     // Route::resource('leaves', LeaveController::class);

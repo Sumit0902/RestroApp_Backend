@@ -87,16 +87,18 @@ class ShiftController extends Controller
     /**
      * Update a shift.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, $companyId, $shiftId)
     {
-        $request->validate([
+        $rv = $request->validate([
             'name' => 'sometimes|string|max:255',
             'start_time' => 'sometimes|date_format:H:i:s',
             'end_time' => 'sometimes|date_format:H:i:s|after:start_time',
         ]);
 
+       
+
         try {
-            $shift = Shift::findOrFail($id);
+            $shift = Shift::findOrFail($shiftId);
             $shift->update($request->all());
 
             return response()->json([

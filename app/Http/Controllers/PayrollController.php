@@ -36,15 +36,23 @@ class PayrollController extends Controller
         ]);
     }
     // Get payroll for a specific user
-    public function payrollByUserId($companyId, $userId)
+    public function payrollByUserId($companyId, $employeeId)
     {
-        $payroll = Payroll::where('employee_id', $userId)
-                          ->whereHas('employee', function ($query) use ($companyId) {
-                              $query->where('company_id', $companyId);
-                          })
-                          ->get();
-
-        return response()->json($payroll);
+        $slipUrl = "";
+        $allPayrols = [];
+        $payroll = Payroll::where('employee_id', $employeeId)->get();
+        // print_r($payroll);
+        // die();
+        foreach ($payroll as $p) {
+            $slipUrl = Storage::disk('local')->temporaryUrl($p->payslip_url, now()->addHours(24));
+            $allPayrols[] =  array(...$p->toArray(), 'payslip_url' => $slipUrl);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'data' => $allPayrols,
+            'error' => null, 
+        ]);
     }
 
     // Add payroll for a user

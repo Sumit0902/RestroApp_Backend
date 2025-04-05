@@ -1,4 +1,3 @@
-// app/Models/Task.php
 <?php
 
 namespace App\Models;
@@ -15,12 +14,16 @@ class Task extends Model
         'company_id',
         'name',
         'description',
-        'is_recurring',
-        'weekdays',
+        'status',
     ];
 
     protected $casts = [
         'weekdays' => 'array', // Automatically cast JSON to array and vice versa
         'is_recurring' => 'boolean',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

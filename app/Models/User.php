@@ -8,13 +8,14 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use App\Models\Company;
 use App\Models\TimeSheet;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Carbon\Carbon;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasFactory, Notifiable, HasApiTokens, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -107,13 +108,10 @@ class User extends Authenticatable
                 continue; // Skip non-operational days
             }
 
-            $timesheet = $timesheets && $timesheets->count() > 0 
-            ? $timesheets->firstWhere('check_in', '>=', $currentDate->startOfDay())
-            : null;
-        
-            if ($timesheet) {
-                $timesheet = $timesheet->firstWhere('check_out', '<=', $currentDate->endOfDay());
-            }
+            $timesheet = $timesheets->first(function ($ts) use ($currentDate) {
+                return $ts->check_in->between($currentDate->startOfDay(), $currentDate->endOfDay()) && ($ts->check_out ? $ts->check_out->between($currentDate->startOfDay(), $currentDate->endOfDay()) : true);
+            });
+
             
             $timesheet = $timesheet ?? false;
 
@@ -129,12 +127,11 @@ class User extends Authenticatable
                 }
                 $ddd[$day] = $minutesWorked;
             } else {
-                $leave = $leaves && $leaves->count() > 0 ? $leaves->firstWhere('start_date', '<=', $currentDate)
-                    ->firstWhere('end_date', '>=', $currentDate) : false;
+                $leave = $leaves->filter(function ($l) use ($currentDate) {
+                    return Carbon::parse($l->start_date)->lte($currentDate) &&
+                           Carbon::parse($l->end_date)->gte($currentDate);
+                })->first();
 
-                if (!$leave) {
-                    $holidays++;
-                }
                 $ddd[$day] = $leave;
             }
         }
