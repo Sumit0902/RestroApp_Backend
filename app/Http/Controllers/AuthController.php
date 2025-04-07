@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
 use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 
@@ -24,7 +25,7 @@ class AuthController extends Controller
         }
 
         // Check if 2FA is enabled for the user
-        $twoFactorEnabled = !is_null($user->two_factor_secret);
+        $twoFactorEnabled = !is_null($user->two_factor_confirmed_at);
 
         if ($twoFactorEnabled) {
             // Store user ID in session or a temporary state for 2FA verification
@@ -80,9 +81,9 @@ class AuthController extends Controller
 
         $token = $user->createToken(($user->firstname . $user->lastname) . '-AuthToken')->plainTextToken;
         
-        $twoFactorEnabled = !is_null($user->two_factor_secret);
+        $twoFactorEnabled = !is_null($user->two_factor_confirmed_at);
         return response()->json([
-           'id' => $user->id,
+            'id' => $user->id,
             'firstname' => $user->firstname,
             'lastname' => $user->lastname,
             'email' => $user->email,
@@ -111,5 +112,58 @@ class AuthController extends Controller
                 "message"=>"error logged out"
             ], 400);
         }
+    }
+
+    public function sendForgetPasswordMail(Request $request) {
+        try {
+            $request->validate(['email' => 'required|email']);
+    
+            $status = Password::sendResetLink($request->only('email'));
+            
+            return $status === Password::RESET_LINK_SENT
+            ?   response()->json([
+                'success' => true,
+                'data' => 'Password reset link sent to your email.',
+                'error' => null, 
+            ], 201)
+            :  response()->json(['error' => 'Unable to send reset link.'], 400);
+        } catch (\Throwable $th) {
+            return response()->json([
+                "message"=> $th->getMessage()
+            ], 400);
+        }
+
+    }
+    public function verifyToken(Request $request) {
+        try {
+            $request->validate([ 
+                'token' => 'required',
+                'email' => 'required|email',
+                'password' => 'required|min:6|confirmed'
+            ]);
+        
+            $status = Password::reset(
+                $request->only('email', 'password', 'password_confirmation', 'token'),
+                function ($user, $password) {
+                    $user->password = Hash::make($password);
+                    $user->save();
+                }
+            );
+            return $status === Password::PASSWORD_RESET
+            ?  response()->json([
+                'success' => true,
+                'data' => 'Password reset successful.',
+                'error' => null, 
+            ], 201)
+            : response()->json(['error' => 'invalid_token.', 'stst' => $status], 400);
+        } catch (\Throwable $th) {
+            return  response()->json([
+                'success' => false,
+                'data' => null, 
+                'error' => $th->getMessage(),
+            ], 201);
+        }
+    
+       
     }
 }

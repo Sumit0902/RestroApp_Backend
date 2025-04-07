@@ -112,7 +112,7 @@ class TimeSheetController extends Controller
             ]);
 
             $currentTime = now()->format('h:iA');
-            $message = "{$user->firstname} {$user->firstname} just checked in @ {$currentTime}";
+            $message = "{$user->firstname} {$user->lastname} just checked in @ {$currentTime}";
             
             NotificationService::createNotification($message, $employeeId, null, $companyId );
             

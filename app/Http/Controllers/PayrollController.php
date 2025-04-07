@@ -12,14 +12,17 @@ class PayrollController extends Controller
 {
     public function index(Request $request, $companyId) {
     
-        $month = $request->query('month', Carbon::now()->format('Y-m')); // Default to current month if not provided
-        $employees = User::where('company_id', $companyId)->get();
-
-        $employeesWithHours = $employees->map(function ($employee) use ($month) {
+        $rawmonth = $request->query('month', Carbon::now()->format('Y-m')); // Default to current month if not provided
+        $employees = User::select('firstname','lastname', 'id', 'avatar', 'email', 'company_id', 'wage', 'wage_rate')->where('company_id', $companyId)->get();
+        [$year, $month] = explode('-', $rawmonth);
+        $employeesWithHours = $employees->map(function ($employee) use ($year, $month, $rawmonth) {
             
-            $payroll = Payroll::where('employee_id', $employee->id)->first();
+            $payroll = Payroll::where('employee_id', $employee->id)
+                ->whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->first();
         
-            $employee->hours_worked = $employee->hoursWorked($month); 
+            $employee->hours_worked = $employee->hoursWorked($rawmonth); 
             if ($payroll && $payroll->payslip_url) {
                 $employee->payroll_status = Storage::disk('local')->temporaryUrl($payroll->payslip_url, now()->addHours(24));
             } else {
@@ -32,7 +35,11 @@ class PayrollController extends Controller
             'success' => true,
             'data' => $employeesWithHours,
             'error' => null,
-            'test' => 'dfdf'
+            'test' => [
+                'month' => $month,
+                'employees' => $employeesWithHours,
+                'company_id' => $companyId
+            ]
         ]);
     }
     // Get payroll for a specific user

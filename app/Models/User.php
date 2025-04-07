@@ -70,76 +70,110 @@ class User extends Authenticatable
      * @param string $month Format: 'YYYY-MM'
      * @return array
      */
+    // public function hoursWorked($month)
+    // {
+    //     [$year, $month] = explode('-', $month);
+
+    //     $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
+    //     $endOfMonth = $startOfMonth->copy()->endOfMonth();
+    //     $today = Carbon::today();
+        
+    //     if ($startOfMonth->isSameMonth($today)) {
+    //         $endOfMonth = $today;
+    //     }
+    //     $company = $this->company;
+
+    //     $timesheets = TimeSheet::where('company_id', $company->id)->where('user_id', $this->id)
+    //         ->whereBetween('check_in', [$startOfMonth, $endOfMonth])
+    //         ->get();
+
+    //     $leaves = Leave::where('user_id', $this->id)
+    //         ->whereBetween('start_date', [$startOfMonth, $endOfMonth])
+    //         ->orWhereBetween('end_date', [$startOfMonth, $endOfMonth])
+    //         ->get();
+        
+    //     $operationalDays = explode(',', $company->workingDays);
+
+       
+    //     $totalMinutes = 0;
+    //     $otMinutes = 0;
+    //     $holidays = 0;
+    //     $ddd = array();
+    //     for ($day = 1; $day <= $endOfMonth->day; $day++) {
+    //         $currentDate = Carbon::create($year, $month, $day);
+    //         $dayOfWeek = $currentDate->dayOfWeek;
+
+    //         if (!in_array((string) $dayOfWeek, $operationalDays)) {
+    //               $ddd[$day] = [$dayOfWeek , $operationalDays];
+    //             continue; // Skip non-operational days
+    //         }
+
+    //         $timesheet = $timesheets->first(function ($ts) use ($currentDate) {
+    //             return $ts->check_in->between($currentDate->startOfDay(), $currentDate->endOfDay()) && ($ts->check_out ? $ts->check_out->between($currentDate->startOfDay(), $currentDate->endOfDay()) : true);
+    //         });
+
+            
+    //         $timesheet = $timesheet ?? false;
+
+    //         if ($timesheet) {
+    //             $checkIn = $timesheet->check_in;
+    //             $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8); // Assume 8 hours if no check-out
+
+    //             $minutesWorked = $checkIn->diffInMinutes($checkOut);
+    //             $totalMinutes += $minutesWorked;
+
+    //             if ($minutesWorked > 480) { // 8 hours in minutes
+    //                 $otMinutes += $minutesWorked - 480;
+    //             }
+    //             $ddd[$day] = $minutesWorked;
+    //         } else {
+    //             $leave = $leaves->filter(function ($l) use ($currentDate) {
+    //                 return Carbon::parse($l->start_date)->lte($currentDate) &&
+    //                        Carbon::parse($l->end_date)->gte($currentDate);
+    //             })->first();
+
+    //             $ddd[$day] = $leave;
+    //         }
+    //     }
+
+    //     return [
+    //         'hoursWorked' => round($totalMinutes / 60, 2),
+    //         'otHours' => round($otMinutes / 60, 2),
+    //         'holidays' => $holidays,
+    //     ];
+    // }
+
     public function hoursWorked($month)
     {
         [$year, $month] = explode('-', $month);
 
         $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
-        $endOfMonth = $startOfMonth->copy()->endOfMonth();
-        $today = Carbon::today();
-        
-        if ($startOfMonth->isSameMonth($today)) {
-            $endOfMonth = $today;
-        }
-        $company = $this->company;
+        $endOfMonth = Carbon::now()->isSameMonth($startOfMonth) ? Carbon::today() : $startOfMonth->copy()->endOfMonth();
 
-        $timesheets = TimeSheet::where('company_id', $company->id)->where('user_id', $this->id)
+        $timesheets = TimeSheet::where('company_id', $this->company->id)
+            ->where('user_id', $this->id)
             ->whereBetween('check_in', [$startOfMonth, $endOfMonth])
             ->get();
 
-        $leaves = Leave::where('user_id', $this->id)
-            ->whereBetween('start_date', [$startOfMonth, $endOfMonth])
-            ->orWhereBetween('end_date', [$startOfMonth, $endOfMonth])
-            ->get();
-        
-        $operationalDays = explode(',', $company->workingDays);
-
-       
         $totalMinutes = 0;
         $otMinutes = 0;
-        $holidays = 0;
-        $ddd = array();
-        for ($day = 1; $day <= $endOfMonth->day; $day++) {
-            $currentDate = Carbon::create($year, $month, $day);
-            $dayOfWeek = $currentDate->dayOfWeek;
 
-            if (!in_array((string) $dayOfWeek, $operationalDays)) {
-                  $ddd[$day] = [$dayOfWeek , $operationalDays];
-                continue; // Skip non-operational days
-            }
+        foreach ($timesheets as $timesheet) {
+            $checkIn = $timesheet->check_in;
+            $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8); // Default to 8 hours if no check-out
 
-            $timesheet = $timesheets->first(function ($ts) use ($currentDate) {
-                return $ts->check_in->between($currentDate->startOfDay(), $currentDate->endOfDay()) && ($ts->check_out ? $ts->check_out->between($currentDate->startOfDay(), $currentDate->endOfDay()) : true);
-            });
+            $minutesWorked = $checkIn->diffInMinutes($checkOut);
+            $totalMinutes += $minutesWorked;
 
-            
-            $timesheet = $timesheet ?? false;
-
-            if ($timesheet) {
-                $checkIn = $timesheet->check_in;
-                $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8); // Assume 8 hours if no check-out
-
-                $minutesWorked = $checkIn->diffInMinutes($checkOut);
-                $totalMinutes += $minutesWorked;
-
-                if ($minutesWorked > 480) { // 8 hours in minutes
-                    $otMinutes += $minutesWorked - 480;
-                }
-                $ddd[$day] = $minutesWorked;
-            } else {
-                $leave = $leaves->filter(function ($l) use ($currentDate) {
-                    return Carbon::parse($l->start_date)->lte($currentDate) &&
-                           Carbon::parse($l->end_date)->gte($currentDate);
-                })->first();
-
-                $ddd[$day] = $leave;
+            if ($minutesWorked > 480) { // 8 hours = 480 minutes
+                $otMinutes += $minutesWorked - 480;
             }
         }
 
         return [
             'hoursWorked' => round($totalMinutes / 60, 2),
             'otHours' => round($otMinutes / 60, 2),
-            'holidays' => $holidays,
         ];
     }
+
 }

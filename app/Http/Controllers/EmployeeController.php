@@ -121,12 +121,7 @@ class EmployeeController extends Controller
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        // if ($request->hasFile('avatar')) {
-        //     $file = $request->file('avatar');
-        //     $filename = time() . '.' . $file->getClientOriginalExtension();
-        //     $file->move(public_path('avatars'), $filename);
-        //     $validatedData['avatar'] = 'avatars/' . $filename;
-        // }
+     
 
         if ($request->hasFile('avatar')) {
             $file = $request->file('avatar');
@@ -166,7 +161,7 @@ class EmployeeController extends Controller
 
         $employee->update($validatedData);
 
-        $twoFactorEnabled = !is_null($employee->two_factor_secret);
+        $twoFactorEnabled = !is_null($employee->two_factor_confirmed_at);
 
         return response()->json([
             'success' => true,

@@ -111,7 +111,8 @@ class UserController extends Controller
             'two_factor_secret' => $user->two_factor_secret, // Optional, for manual entry
         ]);
     }
-
+    
+    
     public function confirmTwoFactor(Request $request,$companyId, $employeeId ) {
         try {
             $user = User::find($employeeId);
@@ -157,7 +158,49 @@ class UserController extends Controller
             'success' => false,
             'data' => '2FA successfully enabled',
             'error' => null, 
+            'recovery_codes' => json_decode(decrypt($user->two_factor_recovery_codes), true),
         ],200);
+    }
+
+    public function disableTwoFactor(Request $request, $companyId, $employeeId)
+    {
+        $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        try {
+            // Find the user by employee ID
+            $user = User::findOrFail($employeeId);
+
+            // Check if the provided password matches the user's password
+            if (!\Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'data' => null,
+                    'error' => 'The provided password is incorrect.',
+                ], 401);
+            }
+
+            // Disable two-factor authentication
+            $user->forceFill([
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+            ])->save();
+
+            return response()->json([
+                'success' => true,
+                'data' => 'Two-factor authentication has been disabled successfully.',
+                'error' => null,
+            ], 200);
+        } catch (\Throwable $th) {
+            // Handle any errors
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => $th->getMessage(),
+            ], 400);
+        }
     }
 
     public function show(Request $request)

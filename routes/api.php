@@ -10,6 +10,7 @@ use App\Http\Controllers\TimeSheetController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Middleware\CheckAuthToken;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\UserController;
@@ -24,9 +25,15 @@ use App\Http\Controllers\AuthController;
 
 Route::post('login',[AuthController::class,'login'])->name('authlogin');
 Route::post('two-factor-challenge', [AuthController::class, 'verifyTwoFactor']);
-Route::post('logout',[AuthController::class,'logout'])
-  ->middleware('auth:sanctum');
+Route::post('register-company',[CompanyController::class,'companyRegistration'])->name('companyRegistration');
 
+Route::post('/reset-password-request', [AuthController::class, 'sendForgetPasswordMail'])->name('password.sendResetLink');
+Route::post('/reset-password', [AuthController::class, 'verifyToken'])->name('password.resetpassword'); 
+
+Route::post('logout',[AuthController::class,'logout'])
+->middleware('auth:sanctum');
+
+ 
 
 Route::get('/', function (Request $request) { 
     return view('welcome');
@@ -53,7 +60,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::post('/', [ScheduleController::class, 'index'])->name('companies.schedules.index');
             Route::post('add', [ScheduleController::class, 'store'])->name('companies.schedules.create');
             Route::get('{scheduleId}', [ScheduleController::class, 'getSchedule'])->name('companies.schedules.show');
-            Route::get('{employeeId}', [ScheduleController::class, 'getEmployeeSchedule'])->name('companies.schedules.employeeSchedule');
+            Route::post('{employeeId}', [ScheduleController::class, 'getEmployeeSchedule'])->name('companies.schedules.employeeSchedule');
             Route::patch('{scheduleId}/update', [ScheduleController::class, 'update'])->name('companies.schedules.update');
             Route::delete('{scheduleId}/delete', [ScheduleController::class, 'destroy'])->name('companies.schedules.delete');
         });
@@ -66,6 +73,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::patch('{employeeId}/update', [EmployeeController::class, 'update'])->name('companies.employees.update');
             Route::post('{employeeId}/updateMyProfile', [EmployeeController::class, 'updateMyProfile'])->name('companies.employees.updateMyProfile');
             Route::post('{employeeId}/enable-2fa', [UserController::class, 'enableTwoFactor'])->name('companies.employees.enable2fa');
+            Route::post('{employeeId}/disable-2fa', [UserController::class, 'disableTwoFactor'])->name('companies.employees.disable2fa');
             Route::post('{employeeId}/confirm-2fa', [UserController::class, 'confirmTwoFactor'])->name('companies.employees.confirm2Fa');
             Route::delete('{employeeId}/delete', [EmployeeController::class, 'destroy'])->name('companies.employees.delete');
         });
@@ -76,6 +84,9 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::get('/', [TaskController::class, 'index'])->name('companies.tasks.index');
             Route::post('/add', [TaskController::class, 'store']);
             Route::get('{taskid}', [TaskController::class, 'show']);
+            Route::get('{employeeId}', [TaskController::class, 'getEmployeeTasks']);
+            Route::post('{employeeId}/weekly', [TaskController::class, 'getEmployeeWeeklyTasks']);
+            Route::post('weekly', [TaskController::class, 'getCompanyWeeklyTasks']);
             Route::put('{taskid}/update', [TaskController::class, 'update']);
             Route::delete('{taskid}/delete', [TaskController::class, 'destroy']);
         });
@@ -106,10 +117,6 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::post('/', [PayrollController::class, 'index']); // List entries
             Route::post('/generate/{employeeId}', [PayrollController::class, 'generatePayroll']); // Fetch single entry
             Route::get('/{employeeId}', [PayrollController::class, 'payrollByUserId']); // Fetch single entry
-            // Route::post('/check-in', [TimeSheetController::class, 'checkIn']); // Check-in
-            // Route::post('/check-out', [TimeSheetController::class, 'checkOut']); // Check-out
-            // Route::post('/reset-check-out/{id}', [TimeSheetController::class, 'resetCheckOut']); // Reset check-out
-            // Route::get('/{id}', [TimeSheetController::class, 'show']); // Fetch single entry
         });
 
         
@@ -130,9 +137,9 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
 
 
     // Employee routes
-    Route::get('employee/{employeeId}', [UserController::class, 'show'])->name('employee.show');
-    Route::post('employee/add', [UserController::class, 'store'])->name('employee.store');
-    Route::get('employee/update', [UserController::class, 'update'])->name('employee.update');
+    // Route::get('employee/{employeeId}', [UserController::class, 'show'])->name('employee.show');
+    // Route::post('employee/add', [UserController::class, 'store'])->name('employee.store');
+    // Route::get('employee/update', [UserController::class, 'update'])->name('employee.update');
     // deparmtents routes
     // Route::get('department/{department}', [DepartmentController::class, 'show'])->name('department.show');
     

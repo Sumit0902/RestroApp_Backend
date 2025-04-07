@@ -15,11 +15,12 @@ class LeaveController extends Controller
 
         try {
             $leaves = Leave::where('company_id', $companyId)
-                        ->orderByRaw("CASE 
-                            WHEN status = 'pending' THEN 1
-                            WHEN status = 'approved' THEN 2
-                            WHEN status = 'denied' THEN 3
-                            ELSE 4 END")
+                        // ->orderByRaw("CASE 
+                        //     WHEN status = 'pending' THEN 1
+                        //     WHEN status = 'approved' THEN 2
+                        //     WHEN status = 'denied' THEN 3
+                        //     ELSE 4 END")
+                        ->orderBy('created_at', 'desc')
                         ->with('user')
                         ->get();
             

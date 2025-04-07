@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Company;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
 
 class CompanyController extends Controller
 {
@@ -36,7 +38,7 @@ class CompanyController extends Controller
     public function store(Request $request)
     {   
         try {
-            $companyData = $request->except('logo'); // Get all the data except the logo
+            $companyData = $request->except('logo'); 
             $companyData['logo'] = null;
             if ($request->hasFile('logo')) {
                 $file = $request->file('logo');
@@ -63,7 +65,7 @@ class CompanyController extends Controller
                 $randomString = substr(str_shuffle('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 12);
                 $filename = 'logo_' . $randomString . '.' . $extension;
                 $logoPath = $file->storeAs('', $filename, 'public');
-                $companyData['logo'] = $logoPath; // Add the logo path to the company data
+                $companyData['logo'] = $logoPath; 
             }
 
             $company = Company::create($companyData);
@@ -119,8 +121,7 @@ class CompanyController extends Controller
 
 
             $companyData = $request->except('logo');
-            $companyData['avatar'] = null;
-            // Handle avatar upload if provided
+            $companyData['avatar'] = null; 
             if ($request->hasFile('logo')) {
                 $file = $request->file('logo');
                 $allowedExtensions = ['webp', 'svg', 'png', 'jpeg', 'jpg', 'gif'];
@@ -212,5 +213,67 @@ class CompanyController extends Controller
             ],400);
         }
 
+    }
+
+    public function companyRegistration(Request $request)
+    {
+        $request->validate([
+            // Company fields
+            'company_name' => 'required|string|max:255',
+            'company_about' => 'nullable|string',
+            'company_address1' => 'required|string|max:255',
+            'company_address2' => 'nullable|string|max:255',
+            'company_city' => 'required|string|max:255',
+            'company_state' => 'required|string|max:255',
+            'company_zip' => 'required|string|max:10',
+            'phone' => 'required|string|max:25',
+            'email' => 'required|email|unique:companies,email',
+
+            'firstname' => 'required|string|max:255',
+            'lastname' => 'required|string|max:255',
+            'manager_email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            // 'manager_phone' => 'required|string|max:15',
+            'role' => 'required|string|in:manager',
+        ]);
+
+        try {
+            $company = Company::create([
+                'company_name' => $request->company_name,
+                'company_about' => $request->company_about,
+                'company_address1' => $request->company_address1,
+                'company_address2' => $request->company_address2,
+                'company_city' => $request->company_city,
+                'company_state' => $request->company_state,
+                'company_zip' => $request->company_zip,
+                'phone' => $request->phone,
+                'email' => $request->email,
+            ]);
+
+            $manager = User::create([
+                'firstname' => $request->firstname,
+                'lastname' => $request->lastname,
+                'email' => $request->manager_email,
+                'password' => Hash::make($request->password),
+                'phone' => $request->manager_phone,
+                'role' => 'manager', //  as this is company registration and only manager can do that
+                'company_id' => $company->id, 
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Company and manager created successfully.',
+                'data' => [
+                    'company' => $company,
+                    'manager' => $manager,
+                ],
+            ], 201);
+        } catch (\Throwable $th) { 
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred during registration.',
+                'error' => $th->getMessage(),
+            ], 400);
+        }
     }
 }

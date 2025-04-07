@@ -193,13 +193,12 @@ class ScheduleController extends Controller
             return response()->json(['error' => 'Failed to fetch schedule data'.$e->getMessage()], 500);
         }
     }
-    public function getEmployeeSchedule(Request $request)
+    public function getEmployeeSchedule(Request $request, $companyId, $employeeId)
     {
         try {
             $weekNumber = $request->week_number;
             $year = $request->year;
-            $companyId = $request->company_id;
-            $employeeId = $request->employee_id;
+       
     
             $schedules = Schedule::where('company_id', $companyId)
                 ->where('week_number', $weekNumber)
@@ -241,6 +240,12 @@ class ScheduleController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => $schedData,
+                'rd' => [
+                    'week_number' => $weekNumber,
+                    'year' => $year,
+                    'company_id' => $companyId,
+                    'employee_id' => $employeeId,
+                ],
                 'error' => null,
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
