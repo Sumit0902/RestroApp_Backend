@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('payroll', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('employee_id'); // Relation to users/employees table
+            $table->decimal('pay_rate', 10, 2);
             $table->decimal('basic_salary', 10, 2);
             $table->decimal('bonus', 10, 2)->nullable();
             $table->decimal('deduction', 10, 2)->nullable();

@@ -1,6 +1,5 @@
 <?php
 
-// use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\NotificationController;

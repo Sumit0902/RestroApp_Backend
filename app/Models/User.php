@@ -70,79 +70,6 @@ class User extends Authenticatable
      * @param string $month Format: 'YYYY-MM'
      * @return array
      */
-    // public function hoursWorked($month)
-    // {
-    //     [$year, $month] = explode('-', $month);
-
-    //     $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
-    //     $endOfMonth = $startOfMonth->copy()->endOfMonth();
-    //     $today = Carbon::today();
-        
-    //     if ($startOfMonth->isSameMonth($today)) {
-    //         $endOfMonth = $today;
-    //     }
-    //     $company = $this->company;
-
-    //     $timesheets = TimeSheet::where('company_id', $company->id)->where('user_id', $this->id)
-    //         ->whereBetween('check_in', [$startOfMonth, $endOfMonth])
-    //         ->get();
-
-    //     $leaves = Leave::where('user_id', $this->id)
-    //         ->whereBetween('start_date', [$startOfMonth, $endOfMonth])
-    //         ->orWhereBetween('end_date', [$startOfMonth, $endOfMonth])
-    //         ->get();
-        
-    //     $operationalDays = explode(',', $company->workingDays);
-
-       
-    //     $totalMinutes = 0;
-    //     $otMinutes = 0;
-    //     $holidays = 0;
-    //     $ddd = array();
-    //     for ($day = 1; $day <= $endOfMonth->day; $day++) {
-    //         $currentDate = Carbon::create($year, $month, $day);
-    //         $dayOfWeek = $currentDate->dayOfWeek;
-
-    //         if (!in_array((string) $dayOfWeek, $operationalDays)) {
-    //               $ddd[$day] = [$dayOfWeek , $operationalDays];
-    //             continue; // Skip non-operational days
-    //         }
-
-    //         $timesheet = $timesheets->first(function ($ts) use ($currentDate) {
-    //             return $ts->check_in->between($currentDate->startOfDay(), $currentDate->endOfDay()) && ($ts->check_out ? $ts->check_out->between($currentDate->startOfDay(), $currentDate->endOfDay()) : true);
-    //         });
-
-            
-    //         $timesheet = $timesheet ?? false;
-
-    //         if ($timesheet) {
-    //             $checkIn = $timesheet->check_in;
-    //             $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8); // Assume 8 hours if no check-out
-
-    //             $minutesWorked = $checkIn->diffInMinutes($checkOut);
-    //             $totalMinutes += $minutesWorked;
-
-    //             if ($minutesWorked > 480) { // 8 hours in minutes
-    //                 $otMinutes += $minutesWorked - 480;
-    //             }
-    //             $ddd[$day] = $minutesWorked;
-    //         } else {
-    //             $leave = $leaves->filter(function ($l) use ($currentDate) {
-    //                 return Carbon::parse($l->start_date)->lte($currentDate) &&
-    //                        Carbon::parse($l->end_date)->gte($currentDate);
-    //             })->first();
-
-    //             $ddd[$day] = $leave;
-    //         }
-    //     }
-
-    //     return [
-    //         'hoursWorked' => round($totalMinutes / 60, 2),
-    //         'otHours' => round($otMinutes / 60, 2),
-    //         'holidays' => $holidays,
-    //     ];
-    // }
-
     public function hoursWorked($month)
     {
         [$year, $month] = explode('-', $month);
@@ -150,14 +77,24 @@ class User extends Authenticatable
         $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
         $endOfMonth = Carbon::now()->isSameMonth($startOfMonth) ? Carbon::today() : $startOfMonth->copy()->endOfMonth();
 
+        // Fetch timesheets for the user within the month
         $timesheets = TimeSheet::where('company_id', $this->company->id)
             ->where('user_id', $this->id)
             ->whereBetween('check_in', [$startOfMonth, $endOfMonth])
             ->get();
 
+        // Fetch leaves for the user within the month
+        $leaves = Leave::where('user_id', $this->id)
+            ->where(function ($query) use ($startOfMonth, $endOfMonth) {
+                $query->whereBetween('start_date', [$startOfMonth, $endOfMonth])
+                      ->orWhereBetween('end_date', [$startOfMonth, $endOfMonth]);
+            })
+            ->get();
+
         $totalMinutes = 0;
         $otMinutes = 0;
 
+        // Calculate total minutes worked and overtime minutes
         foreach ($timesheets as $timesheet) {
             $checkIn = $timesheet->check_in;
             $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8); // Default to 8 hours if no check-out
@@ -170,9 +107,33 @@ class User extends Authenticatable
             }
         }
 
+        // Count the number of leave days (holidays)
+        $holidays = 0;
+        foreach ($leaves as $leave) {
+            $leaveStart = Carbon::parse($leave->start_date)->startOfDay();
+            $leaveEnd = Carbon::parse($leave->end_date)->endOfDay();
+
+            // Ensure the leave days are within the month range
+            $leaveStart = $leaveStart->lt($startOfMonth) ? $startOfMonth : $leaveStart;
+            $leaveEnd = $leaveEnd->gt($endOfMonth) ? $endOfMonth : $leaveEnd;
+
+            $holidays += $leaveStart->diffInDays($leaveEnd) + 1; // Add 1 to include the start day
+        }
+
+        // Convert total minutes to hours and minutes
+        $hoursWorked = round($totalMinutes / 60, 2); // Total hours in decimal format
+        $otHours = round($otMinutes / 60, 2); // Overtime hours in decimal format
+
+        // Format total minutes as HH:MM
+        $hoursWorkedFormatted = sprintf('%02d:%02d', floor($totalMinutes / 60), $totalMinutes % 60); // Format as HH:MM
+        $otHoursFormatted = sprintf('%02d:%02d', floor($otMinutes / 60), $otMinutes % 60); // Format as HH:MM
+
         return [
-            'hoursWorked' => round($totalMinutes / 60, 2),
-            'otHours' => round($otMinutes / 60, 2),
+            'hoursWorked' => $hoursWorked, // Total hours in decimal format
+            'otHours' => $otHours, // Overtime hours in decimal format
+            'hoursWorkedFormatted' => $hoursWorkedFormatted, // Total hours formatted as HH:MM
+            'otHoursFormatted' => $otHoursFormatted, // Overtime hours formatted as HH:MM
+            'holidays' => $holidays, // Total leave days
         ];
     }
 

@@ -19,6 +19,7 @@ class Payroll extends Model
      */
     protected $fillable = [
         'employee_id',
+        'pay_rate',
         'basic_salary',
         'bonus',
         'deduction',
@@ -32,6 +33,7 @@ class Payroll extends Model
      * The attributes that should be cast to native types.
      */
     protected $casts = [
+        'pay_rate' => 'decimal:2',
         'basic_salary' => 'decimal:2',
         'bonus' => 'decimal:2',
         'deduction' => 'decimal:2',

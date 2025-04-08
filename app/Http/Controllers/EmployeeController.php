@@ -35,7 +35,7 @@ class EmployeeController extends Controller
             'phone' => 'nullable|string|max:15',
             'role' => 'required|string|in:employee,manager',
             'company_role' => 'nullable|string|max:255',
-            'wage' => 'nullable|numeric',
+            'wage' => 'nullable|string',
             'wage_rate' => 'nullable|numeric',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);

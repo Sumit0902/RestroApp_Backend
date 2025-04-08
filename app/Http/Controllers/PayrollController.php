@@ -24,7 +24,8 @@ class PayrollController extends Controller
         
             $employee->hours_worked = $employee->hoursWorked($rawmonth); 
             if ($payroll && $payroll->payslip_url) {
-                $employee->payroll_status = Storage::disk('local')->temporaryUrl($payroll->payslip_url, now()->addHours(24));
+                // $employee->payroll_status = Storage::disk('local')->temporaryUrl($payroll->payslip_url, now()->addHours(24));
+                $employee->payroll_status = asset($payroll->payslip_url, true);
             } else {
                 $employee->payroll_status = null;
             }
@@ -51,7 +52,8 @@ class PayrollController extends Controller
         // print_r($payroll);
         // die();
         foreach ($payroll as $p) {
-            $slipUrl = Storage::disk('local')->temporaryUrl($p->payslip_url, now()->addHours(24));
+            // $slipUrl = Storage::disk('local')->temporaryUrl($p->payslip_url, now()->addHours(24));
+            $slipUrl = asset($p->payslip_url, true);
             $allPayrols[] =  array(...$p->toArray(), 'payslip_url' => $slipUrl);
         }
         
@@ -158,19 +160,26 @@ class PayrollController extends Controller
         $otPay = $otHours * $wage * 1.2; // 20% more for overtime hours
 
         $subtotal = $regularPay + $otPay;
-        $bonus = 0; // Set default values or calculate as needed
-        $deduction = 0; // Set default values or calculate as needed
+        $bonus = 0; 
+        $deduction = 0; 
         $total = $subtotal + $bonus - $deduction;
 
         $payroll = Payroll::create([
             'employee_id' => $employeeId,
-            'basic_salary' => $subtotal, // Set default values or calculate as needed
+            'pay_rate' => $wage,
+            'basic_salary' => $subtotal, 
             'bonus' => $bonus,
             'deduction' => $deduction,
             'overtime_hours' => $otHours,
-            'overtime_pay' => $otPay, // Set default values or calculate as needed
-            'total_salary' => $total, // Set default values or calculate as needed
+            'overtime_pay' => $otPay, 
+            'total_salary' => $total, 
         ]);
+
+        try {
+            //code...
+        } catch (\Throwable $th) {
+            //throw $th;
+        }
 
         $pdf = Pdf::loadView('payroll.payslip', [
             'month' => $month,
@@ -189,13 +198,25 @@ class PayrollController extends Controller
             'subtotal' => '£' . number_format($subtotal, 2),
             'total' => '£' . number_format($total, 2)
         ]);
-        $fileName = 'payslips/' . $payroll->id . '_payslip.pdf';
-        Storage::put($fileName, $pdf->output());
 
-        // Store the URL in the database
-        $url = Storage::url($fileName);
-        $payroll->update(['payslip_url' => $fileName]);
+        // Define public folder path for the payslip
+        $fileName = public_path('payslips/' . $payroll->id . '_payslip.pdf');
+
+        // Ensure the payslips folder exists
+        if (!file_exists(public_path('payslips'))) {
+            mkdir(public_path('payslips'), 0755, true);
+        }
+
+        // Save the PDF directly to the public directory
+        $pdf->save($fileName);
+
+        // Generate public URL
+        $url = asset('payslips/' . $payroll->id . '_payslip.pdf');
+
+        // Store the relative path in the database
+        $payroll->update(['payslip_url' => 'payslips/' . $payroll->id . '_payslip.pdf']);
 
         return response()->json(['url' => $url]);
     }
+
 }

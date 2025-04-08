@@ -144,29 +144,49 @@ class TimeSheetController extends Controller
         try {
             $timesheet = TimeSheet::where('company_id', $companyId)
                 ->where('user_id', $employeeId)
-                ->whereNull('check_out')
                 ->whereDate('check_in', '=', now()->toDateString())
                 ->latest('check_in')
                 ->first();
     
-            if(!$timesheet) {
+            if (!$timesheet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No active check-in found for today.',
+                ], 400); // Bad Request
+            }
+
+            // Check if check-out already exists
+            if ($timesheet->check_out) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Check-out for today already exists.',
                 ], 400); // Bad Request
             }
-            $timesheet->update(['check_out' => now()]);
-    
+
+            // Check if 8 hours have passed since check-in
+            $checkInTime = Carbon::parse($timesheet->check_in);
+            $currentTime = now();
+            $hoursPassed = $checkInTime->diffInHours($currentTime);
+
+            if ($hoursPassed < 8) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'You have to checkout after 8 hours.',
+                ], 400); // Bad Request
+            }
+
+            // Update the timesheet with the check-out time
+            $timesheet->update(['check_out' => $currentTime]);
+
             return response()->json([
                 'success' => true,
                 'timesheet' => $timesheet,
-            ],201);
-            //code...
+            ], 201);
         } catch (\Throwable $th) {
             return response()->json([
                 'success' => false,
                 'message' => $th->getMessage(),
-            ], 400); // Bad Requestw
+            ], 400); // Bad Request
         }
     }
 
