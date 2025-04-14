@@ -25,7 +25,7 @@ class PayrollController extends Controller
             $employee->hours_worked = $employee->hoursWorked($rawmonth); 
             if ($payroll && $payroll->payslip_url) {
                 // $employee->payroll_status = Storage::disk('local')->temporaryUrl($payroll->payslip_url, now()->addHours(24));
-                $employee->payroll_status = asset($payroll->payslip_url, true);
+                $employee->payroll_status = asset($payroll->payslip_url);
             } else {
                 $employee->payroll_status = null;
             }
@@ -65,29 +65,29 @@ class PayrollController extends Controller
     }
 
     // Add payroll for a user
-    public function addPayroll(Request $request, $companyId)
-    {
-        $validated = $request->validate([
-            'employee_id' => 'required|exists:users,id',
-            'basic_salary' => 'required|numeric',
-            'bonus' => 'nullable|numeric',
-            'deduction' => 'nullable|numeric',
-            'overtime_hours' => 'nullable|numeric',
-            'overtime_pay' => 'nullable|numeric',
-        ]);
+    // public function addPayroll(Request $request, $companyId)
+    // {
+    //     $validated = $request->validate([
+    //         'employee_id' => 'required|exists:users,id',
+    //         'basic_salary' => 'required|numeric',
+    //         'bonus' => 'nullable|numeric',
+    //         'deduction' => 'nullable|numeric',
+    //         'overtime_hours' => 'nullable|numeric',
+    //         'overtime_pay' => 'nullable|numeric',
+    //     ]);
 
-        // Ensure user belongs to the company
-        $employee = User::where('id', $request->employee_id)->where('company_id', $companyId)->first();
-        if (!$employee) {
-            return response()->json(['error' => 'Employee does not belong to this company.'], 404);
-        }
+    //     // Ensure user belongs to the company
+    //     $employee = User::where('id', $request->employee_id)->where('company_id', $companyId)->first();
+    //     if (!$employee) {
+    //         return response()->json(['error' => 'Employee does not belong to this company.'], 404);
+    //     }
 
-        $totalSalary = $validated['basic_salary'] + ($validated['bonus'] ?? 0) - ($validated['deduction'] ?? 0) + (($validated['overtime_hours'] ?? 0) * ($validated['overtime_pay'] ?? 0));
+    //     $totalSalary = $validated['basic_salary'] + ($validated['bonus'] ?? 0) - ($validated['deduction'] ?? 0) + (($validated['overtime_hours'] ?? 0) * ($validated['overtime_pay'] ?? 0));
 
-        $payroll = Payroll::create(array_merge($validated, ['total_salary' => $totalSalary]));
+    //     $payroll = Payroll::create(array_merge($validated, ['total_salary' => $totalSalary]));
 
-        return response()->json($payroll);
-    }
+    //     return response()->json($payroll);
+    // }
 
     // Update payroll for a user
     public function updatePayroll(Request $request, $companyId, $payrollId)
@@ -138,85 +138,90 @@ class PayrollController extends Controller
     }
 
     // Generate payroll PDF and store it
-    public function generatePayroll($companyId, $employeeId)
+    public function generatePayroll(Request $request, $companyId, $employeeId)
     {
+        $validated = $request->validate([
+            'bonus' => 'nullable|numeric',
+            'deduction' => 'nullable|numeric',
+        ]);
+
+        $bonus = $validated['bonus'] ?? 0;
+        $deduction = $validated['deduction'] ?? 0;
+
+     
         $employee = User::where('id', $employeeId)
                         ->where('company_id', $companyId)
                         ->first();
-
+    
         if (!$employee) {
             return response()->json(['error' => 'Employee not found for this company.'], 404);
         }
-
+    
         $month = Carbon::now()->format('F Y');
         $today = Carbon::now()->format('Y-m-d');
         $hoursWorked = $employee->hoursWorked(Carbon::now()->format('Y-m'));
-
+    
         $regularHours = $hoursWorked['hoursWorked'];
         $otHours = $hoursWorked['otHours'];
+        $regularHoursformatted = $hoursWorked['hoursWorkedFormatted'];
+        $otHoursformatted = $hoursWorked['otHoursFormatted'];
         $wage = (float)$employee->wage_rate;
-
+    
         $regularPay = $regularHours * $wage;
         $otPay = $otHours * $wage * 1.2; // 20% more for overtime hours
-
+    
         $subtotal = $regularPay + $otPay;
-        $bonus = 0; 
-        $deduction = 0; 
         $total = $subtotal + $bonus - $deduction;
-
+    
+        
         $payroll = Payroll::create([
             'employee_id' => $employeeId,
             'pay_rate' => $wage,
-            'basic_salary' => $subtotal, 
-            'bonus' => $bonus,
+            'hours_worked' => $regularHoursformatted,
+            'overtime_hours' => $otHoursformatted,
+            'overtime_pay' => $otPay,
             'deduction' => $deduction,
-            'overtime_hours' => $otHours,
-            'overtime_pay' => $otPay, 
-            'total_salary' => $total, 
+            'bonus' => $bonus,
+            'basic_salary' => $subtotal,
+            'total_salary' => $total,
+            'payslip_url' => null, // Placeholder for now
         ]);
-
-        try {
-            //code...
-        } catch (\Throwable $th) {
-            //throw $th;
-        }
-
+    
+      
+    
         $pdf = Pdf::loadView('payroll.payslip', [
             'month' => $month,
             'today' => $today,
             'company' => $employee->company->name,
             'employeeId' => $employee->id,
             'employeeName' => $employee->firstname . ' ' . $employee->lastname,
-            'hoursWorked' => $regularHours,
-            'otHours' => $otHours,
+            'hoursWorked' => $regularHoursformatted,
+            'otHours' => $otHoursformatted,
             'holidays' => $hoursWorked['holidays'],
-            'bonus' => '£' . number_format($bonus, 2),
-            'bonusReason' => '', // Add bonus reason if available
-            'deduction' => '£' . number_format($deduction, 2),
-            'deductionReason' => '', // Add deduction reason if available
+            'bonus' => '£' . number_format($bonus, 2), 
+            'deduction' => '£' . number_format($deduction, 2), 
             'hourlyRate' => '£' . number_format($wage, 2),
             'subtotal' => '£' . number_format($subtotal, 2),
             'total' => '£' . number_format($total, 2)
         ]);
-
-        // Define public folder path for the payslip
+    
         $fileName = public_path('payslips/' . $payroll->id . '_payslip.pdf');
-
-        // Ensure the payslips folder exists
+    
         if (!file_exists(public_path('payslips'))) {
             mkdir(public_path('payslips'), 0755, true);
         }
-
-        // Save the PDF directly to the public directory
+    
         $pdf->save($fileName);
-
-        // Generate public URL
         $url = asset('payslips/' . $payroll->id . '_payslip.pdf');
-
-        // Store the relative path in the database
+    
         $payroll->update(['payslip_url' => 'payslips/' . $payroll->id . '_payslip.pdf']);
-
-        return response()->json(['url' => $url]);
+        
+        return response()->json([
+            'success' => true,
+            'data' => $url,
+            'error' => null, 
+        ]); 
     }
+    
 
 }

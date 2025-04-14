@@ -22,11 +22,19 @@ class Company extends Model
         'phone',
         'email',
         'logo',
+        'ot_type',
+        'ot_rate',
+        'workingDays',
     ];
 
     public function employees() {
         return $this->hasMany(User::class)
                     ->where('role', 'employee');
+    }
+
+    public function managers() {
+        return $this->hasMany(User::class)
+                    ->where('role', 'manager');
     }
 
     public function shifts() {

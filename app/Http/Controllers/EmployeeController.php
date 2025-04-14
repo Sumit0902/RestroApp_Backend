@@ -20,8 +20,7 @@ class EmployeeController extends Controller
         return response()->json([
             'success' => true,
             'data' => $employeesWithHours,
-            'error' => null,
-            'test' => 'dfdf'
+            'error' => null, 
         ]);
     }
 
@@ -59,15 +58,29 @@ class EmployeeController extends Controller
         ], 201);
     }
 
-    public function show($companyId, $employeeId)
+    public function show(Request $request, $companyId, $employeeId)
     {
-        $employee = User::where('company_id', $companyId)->findOrFail($employeeId);
+        try {
 
-        return response()->json([
-            'success' => true,
-            'data' => $employee,
-            'error' => null
-        ]);
+            $month = $request->query('month', Carbon::now()->format('Y-m')); 
+            $employee = User::where('company_id', $companyId)->findOrFail($employeeId);
+    
+            $employeer = $employee->map(function ($employee) use ($month) {
+                $employee->hours_worked = $employee->hoursWorked($month);
+                return $employee;
+            });
+            return response()->json([
+                'success' => true,
+                'data' => $employee,
+                'error' => null
+            ]); 
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => true,
+                'data' => $employee,
+                'error' => null
+            ]);  
+        }
     }
 
     public function update(Request $request, $companyId, $employeeId)
@@ -184,6 +197,49 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function getEmployeeForPayroll(Request $request, $companyId, $employeeId)
+    {
+        try {
+
+            $month = $request->query('month', Carbon::now()->format('Y-m')); 
+            $employee = User::where('company_id', $companyId)->findOrFail($employeeId);
+            $hoursWorked =  $employee->hoursWorked($month);
+            
+            $response = [
+                'id' => $employee->id,
+                'firstname' => $employee->firstname,
+                'lastname' => $employee->lastname,
+                'email' => $employee->email,
+                'avatar' => $employee->avatar,
+                'phone' => $employee->phone,
+                'role' => $employee->role,
+                'company_role' => $employee->company_role,
+                'hoursWorked' => $employee->hoursWorked($month),
+                'wage' => $employee->wage,
+                'wage_rate' => $employee->wage_rate,
+            ];
+
+            if($hoursWorked) {
+                $response['holidays'] = $hoursWorked['holidays']; 
+                $response['hoursWorked'] = $hoursWorked['hoursWorked']; 
+                $response['hoursWorkedFormatted'] = $hoursWorked['hoursWorkedFormatted']; 
+                $response['otHours'] = $hoursWorked['otHours']; 
+                $response['otHoursFormatted'] = $hoursWorked['otHoursFormatted']; 
+            } 
+            
+            return response()->json([
+                'success' => true,
+                'data' => $response,
+                'error' => null
+            ]); 
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => $th->getMessage()
+            ]);  
+        }
+    }
 
     public function destroy($companyId, $employeeId)
     {

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Leave;
+use App\Models\TimeSheet;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Actions\EnableTwoFactorAuthentication;
@@ -239,4 +242,56 @@ class UserController extends Controller
     {
         //
     }
+
+    public static function calculateHoursWorked($employee, $month)
+    {
+        [$year, $month] = explode('-', $month);
+
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
+        $endOfMonth = Carbon::now()->isSameMonth($startOfMonth) ? Carbon::today() : $startOfMonth->copy()->endOfMonth();
+        print_r(['emp'=> $employee]);
+        // Ensure the user has a valid company reference
+        if (!$employee->company) {
+            return ['error' => 'No company associated with this user.'];
+        }
+
+        $timesheets = TimeSheet::where('company_id', $employee->company->id)
+            ->where('user_id', $employee->id)
+            ->whereBetween('check_in', [$startOfMonth, $endOfMonth])
+            ->get();
+
+        $leaves = Leave::where('user_id', $employee->id)
+            ->where('status', 'approved')
+            ->where(function ($query) use ($startOfMonth, $endOfMonth) {
+                $query->whereBetween('start_date', [$startOfMonth, $endOfMonth])
+                    ->orWhereBetween('end_date', [$startOfMonth, $endOfMonth]);
+            })
+            ->get();
+
+        $totalMinutes = 0;
+        $otMinutes = 0;
+
+        foreach ($timesheets as $timesheet) {
+            $checkIn = $timesheet->check_in;
+            $checkOut = $timesheet->check_out ?? $checkIn->copy()->addHours(8);
+
+            $minutesWorked = $checkIn->diffInMinutes($checkOut);
+            $totalMinutes += $minutesWorked;
+
+            if ($minutesWorked > 480) {
+                $otMinutes += $minutesWorked - 480;
+            }
+        }
+
+        $holidays = $leaves->count();
+
+        return [
+            'hoursWorked' => round($totalMinutes / 60, 2),
+            'otHours' => round($otMinutes / 60, 2),
+            'hoursWorkedFormatted' => sprintf('%02d:%02d', floor($totalMinutes / 60), $totalMinutes % 60),
+            'otHoursFormatted' => sprintf('%02d:%02d', floor($otMinutes / 60), $otMinutes % 60),
+            'holidays' => $holidays,
+        ];
+    }
+
 }

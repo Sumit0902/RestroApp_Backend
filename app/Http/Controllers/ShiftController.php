@@ -118,10 +118,10 @@ class ShiftController extends Controller
     /**
      * Delete a shift.
      */
-    public function destroy($id)
+    public function destroy(Request $request, $companyId, $shiftId)
     {
         try {
-            $shift = Shift::findOrFail($id);
+            $shift = Shift::findOrFail($shiftId);
             $shift->delete();
 
             return response()->json([

@@ -69,6 +69,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
             Route::get('/', [EmployeeController::class, 'index'])->name('companies.employees.index');
             Route::post('add', [EmployeeController::class, 'store'])->name('companies.employees.create');
             Route::get('{employeeId}', [EmployeeController::class, 'show'])->name('companies.employees.show');
+            Route::post('{employeeId}/payroll', [EmployeeController::class, 'getEmployeeForPayroll'])->name('companies.employees.getEmployeeForPayroll');
             Route::patch('{employeeId}/update', [EmployeeController::class, 'update'])->name('companies.employees.update');
             Route::post('{employeeId}/updateMyProfile', [EmployeeController::class, 'updateMyProfile'])->name('companies.employees.updateMyProfile');
             Route::post('{employeeId}/enable-2fa', [UserController::class, 'enableTwoFactor'])->name('companies.employees.enable2fa');
@@ -82,7 +83,7 @@ Route::middleware(['auth:sanctum', CheckAuthToken::class])->group(function () {
         Route::group(['prefix' => '{companyId}/tasks'], function () {
             Route::get('/', [TaskController::class, 'index'])->name('companies.tasks.index');
             Route::post('/add', [TaskController::class, 'store']);
-            Route::get('{taskid}', [TaskController::class, 'show']);
+            Route::get('task/{taskid}', [TaskController::class, 'show']);
             Route::get('{employeeId}', [TaskController::class, 'getEmployeeTasks']);
             Route::post('{employeeId}/weekly', [TaskController::class, 'getEmployeeWeeklyTasks']);
             Route::post('weekly', [TaskController::class, 'getCompanyWeeklyTasks']);

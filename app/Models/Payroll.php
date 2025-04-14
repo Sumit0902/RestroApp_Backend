@@ -20,6 +20,7 @@ class Payroll extends Model
     protected $fillable = [
         'employee_id',
         'pay_rate',
+        'hours_worked',
         'basic_salary',
         'bonus',
         'deduction',

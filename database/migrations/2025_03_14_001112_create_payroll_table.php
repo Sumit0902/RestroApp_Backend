@@ -15,11 +15,12 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('employee_id'); // Relation to users/employees table
             $table->decimal('pay_rate', 10, 2);
-            $table->decimal('basic_salary', 10, 2);
-            $table->decimal('bonus', 10, 2)->nullable();
-            $table->decimal('deduction', 10, 2)->nullable();
-            $table->decimal('overtime_hours', 10, 2)->nullable();
+            $table->string('hours_worked');
+            $table->string('overtime_hours');
             $table->decimal('overtime_pay', 10, 2)->nullable();
+            $table->decimal('deduction', 10, 2)->nullable();
+            $table->decimal('bonus', 10, 2)->nullable();
+            $table->decimal('basic_salary', 10, 2);
             $table->decimal('total_salary', 10, 2);
             $table->string('payslip_url')->nullable(); // For payslip generation URL
             $table->timestamps();

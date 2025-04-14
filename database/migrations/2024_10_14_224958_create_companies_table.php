@@ -12,8 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('companies', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+            $table->id();  
             $table->string('company_name');
             $table->string('company_about');
             $table->string('company_address1');
@@ -21,10 +20,13 @@ return new class extends Migration
             $table->string('company_city');
             $table->string('company_state');
             $table->string('company_zip');
+            $table->string('email');
             $table->string('phone')->nullable();
             $table->string('logo')->nullable();
-            $table->string('email');
+            $table->string('ot_type')->default('fixed');
+            $table->decimal('ot_rate', 10, 2);
             $table->string('workingDays')->nullable();
+            $table->timestamps();
         });
     }
 

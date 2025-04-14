@@ -67,10 +67,9 @@ class TaskController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, $companyId, $taskId)
     {
-        $request->validate([
-            'company_id' => 'required|exists:companies,id',
+        $request->validate([ 
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
             'is_recurring' => 'nullable|boolean',
@@ -78,15 +77,15 @@ class TaskController extends Controller
             'weekdays.*' => 'integer|min:0|max:6',
         ]);
 
-        $task = Task::where('id', $id)
-            ->where('company_id', $request->company_id)
+        $task = Task::where('id', $taskId)
+            ->where('company_id', $companyId)
             ->firstOrFail();
 
         $task->update($request->only([
-            'name',
-            'description',
-            'is_recurring',
-            'weekdays',
+            // 'name',
+            // 'description',
+            // 'is_recurring',
+            'status',
         ]));
 
         return response()->json([

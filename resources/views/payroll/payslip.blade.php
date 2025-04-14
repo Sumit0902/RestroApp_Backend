@@ -81,19 +81,11 @@
             <tr>
                 <td>Bonus</td>
                 <td>{{ $bonus }}</td>
-            </tr>
-            <tr>
-                <td>Bonus Reason</td>
-                <td>{{ $bonusReason }}</td>
-            </tr>
+            </tr> 
             <tr>
                 <td>Deduction</td>
                 <td>{{ $deduction }}</td>
-            </tr>
-            <tr>
-                <td>Deduction Reason</td>
-                <td>{{ $deductionReason }}</td>
-            </tr>
+            </tr> 
             <tr>
                 <td class="subtotal">Subtotal</td>
                 <td class="subtotal">{{ $subtotal }}</td>

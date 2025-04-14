@@ -166,6 +166,8 @@ class CompanyController extends Controller
             $company->phone = $companyData['phone'];
             $company->workingDays = $companyData['workingDays'];
             $company->email = $companyData['email'];
+            $company->ot_rate = $companyData['ot_rate'];
+            $company->ot_type = $companyData['ot_type'];
             
 
             $company->save();
@@ -228,7 +230,6 @@ class CompanyController extends Controller
             'company_zip' => 'required|string|max:10',
             'phone' => 'required|string|max:25',
             'email' => 'required|email|unique:companies,email',
-
             'firstname' => 'required|string|max:255',
             'lastname' => 'required|string|max:255',
             'manager_email' => 'required|email|unique:users,email',
