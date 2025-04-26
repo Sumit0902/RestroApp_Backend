@@ -10,8 +10,13 @@ class EmployeeController extends Controller
     public function index(Request $request, $companyId)
     {
         $month = $request->query('month', Carbon::now()->format('Y-m')); // Default to current month if not provided
-        $employees = User::where('company_id', $companyId)->get();
 
+        // Fetch employees for the company excluding those with the role 'manager'
+        $employees = User::where('company_id', $companyId)
+            ->where('role', '!=', 'manager') // Exclude users with the role 'manager'
+            ->get();
+
+        // Map employees to include hours worked
         $employeesWithHours = $employees->map(function ($employee) use ($month) {
             $employee->hours_worked = $employee->hoursWorked($month);
             return $employee;
@@ -20,7 +25,7 @@ class EmployeeController extends Controller
         return response()->json([
             'success' => true,
             'data' => $employeesWithHours,
-            'error' => null, 
+            'error' => null,
         ]);
     }
 
@@ -95,7 +100,7 @@ class EmployeeController extends Controller
             'phone' => 'nullable|string|max:15',
             'role' => 'sometimes|string|in:employee,manager',
             'company_role' => 'nullable|string|max:255',
-            'wage' => 'nullable|numeric',
+            'wage' => 'nullable|string',
             'wage_rate' => 'nullable|numeric',
             'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Payroll;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -13,7 +14,7 @@ class PayrollController extends Controller
     public function index(Request $request, $companyId) {
     
         $rawmonth = $request->query('month', Carbon::now()->format('Y-m')); // Default to current month if not provided
-        $employees = User::select('firstname','lastname', 'id', 'avatar', 'email', 'company_id', 'wage', 'wage_rate')->where('company_id', $companyId)->get();
+        $employees = User::select('firstname','lastname', 'id', 'avatar', 'email', 'company_id', 'wage', 'wage_rate')->where('company_id', $companyId)->where('role', 'employee')->get();
         [$year, $month] = explode('-', $rawmonth);
         $employeesWithHours = $employees->map(function ($employee) use ($year, $month, $rawmonth) {
             
@@ -222,6 +223,42 @@ class PayrollController extends Controller
             'error' => null, 
         ]); 
     }
-    
 
+
+    public function payoutLastMonth()
+    {
+        try {
+            // Get the logged-in user's company ID
+            $companyId = Auth::user()->company_id;
+
+            // Get the start and end dates for the last month
+            $lastMonthStart = Carbon::now()->subMonth()->startOfMonth();
+            $lastMonthEnd = Carbon::now()->subMonth()->endOfMonth();
+
+            // Fetch the total salary payouts for the last month
+            $totalPayout = Payroll::whereHas('employee', function ($query) use ($companyId) {
+                    $query->where('company_id', $companyId);
+                })
+                ->whereBetween('created_at', [$lastMonthStart, $lastMonthEnd])
+                ->sum('total_salary');
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total_payout' => $totalPayout ?? 0, // Ensure 0 is returned if no records are found
+                    'month' => $lastMonthStart->format('F Y'),
+                ], 
+                'error' => null,
+            ], 200);
+        } catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'data' => [
+                    'total_payout' => 0, // Default to 0 in case of an error
+                    'month' => Carbon::now()->subMonth()->startOfMonth()->format('F Y'),
+                ],
+                'error' => $th->getMessage(),
+            ], 400);
+        }
+    }
 }

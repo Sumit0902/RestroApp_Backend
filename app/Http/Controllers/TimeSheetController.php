@@ -27,7 +27,7 @@ class TimeSheetController extends Controller
             $endOfMonth = $startOfMonth->copy()->endOfMonth();
 
             // Fetch users of the company
-            $users = User::where('company_id', $companyId)->get();
+            $users = User::where('company_id', $companyId)->where('role', 'employee')->get();
 
             // Fetch timesheets within the month range
             $attendanceRaw = TimeSheet::where('company_id', $companyId)
@@ -81,8 +81,6 @@ class TimeSheetController extends Controller
         ]);
     }
 
-
-    // Check-in logic
     public function checkIn(Request $request)
     {
         $employeeId = $request->employee_id;
@@ -101,7 +99,7 @@ class TimeSheetController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Check-in for today already exists.',
-            ], 400); // Bad Request
+            ], 400); 
         }
     
         try {
@@ -125,7 +123,7 @@ class TimeSheetController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $th->getMessage(),
-            ], 400); // Bad Request
+            ], 400); 
         }
         
     }
@@ -152,7 +150,7 @@ class TimeSheetController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'No active check-in found for today.',
-                ], 400); // Bad Request
+                ], 400); 
             }
 
             // Check if check-out already exists
@@ -160,7 +158,7 @@ class TimeSheetController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Check-out for today already exists.',
-                ], 400); // Bad Request
+                ], 400); 
             }
 
             // Check if 8 hours have passed since check-in
@@ -172,7 +170,7 @@ class TimeSheetController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'You have to checkout after 8 hours.',
-                ], 400); // Bad Request
+                ], 400); 
             }
 
             // Update the timesheet with the check-out time
@@ -186,7 +184,7 @@ class TimeSheetController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $th->getMessage(),
-            ], 400); // Bad Request
+            ], 400); 
         }
     }
 
