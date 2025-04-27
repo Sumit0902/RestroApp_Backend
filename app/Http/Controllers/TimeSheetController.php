@@ -114,14 +114,18 @@ class TimeSheetController extends Controller
         }
 
         // Convert shift times to AM/PM format
-        $shiftStart = Carbon::parse($shift->start_time)->format('h:i A');
-        $shiftEnd = Carbon::parse($shift->end_time)->format('h:i A');
-
-        // Check if current time is within the shift time
-        if ($currentTime < $shiftStart || $currentTime > $shiftEnd) {
+        $shiftStartTime = Carbon::parse($shift->start_time);
+        $shiftEndTime = Carbon::parse($shift->end_time);
+        $currentTime = Carbon::now();
+        $fmShiftStartTime = $shiftStartTime->format('h:i A');
+        $fmShiftEndTime = $shiftEndTime->format('h:i A');
+        if (
+            ($shiftStartTime < $shiftEndTime && ($currentTime < $shiftStartTime || $currentTime > $shiftEndTime)) || 
+            ($shiftStartTime > $shiftEndTime && !($currentTime >= $shiftStartTime || $currentTime <= $shiftEndTime))
+        ) {
             return response()->json([
                 'success' => false,
-                'message' => "Check-in not allowed outside of shift hours ($shiftStart - $shiftEnd).",
+                'message' => "Check-in not allowed outside of shift hours ($fmShiftStartTime - $fmShiftEndTime). ",
             ], 400);
         }
 
