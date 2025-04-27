@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Schedule;
+use App\Models\Shift;
 use App\Models\TimeSheet;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -81,39 +83,73 @@ class TimeSheetController extends Controller
         ]);
     }
 
-    public function checkIn(Request $request)
-    {
+    public function checkIn(Request $request) {
         $employeeId = $request->employee_id;
         $companyId = $request->company_id;
         $user = User::where('id', $employeeId)->first();
-        // Get today's date in 'Y-m-d' format
         $today = now()->format('Y-m-d');
-    
-        // Check if a timesheet exists for today's date
+        $currentTime = now()->format('h:i A'); // Convert to AM/PM format
+
+        // Check if there's a schedule for today
+        $schedule = Schedule::where('company_id', $companyId)
+            ->where('user_id', $employeeId)
+            ->whereDate('days_schedule', $today)
+            ->first();
+
+        if (!$schedule) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No schedule found for today. Check-in not allowed.',
+            ], 400);
+        }
+
+        // Get the shift associated with the schedule
+        $shift = Shift::where('id', $schedule->shift_id)->first();
+
+        if (!$shift) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Shift details not found for today.',
+            ], 400);
+        }
+
+        // Convert shift times to AM/PM format
+        $shiftStart = Carbon::parse($shift->start_time)->format('h:i A');
+        $shiftEnd = Carbon::parse($shift->end_time)->format('h:i A');
+
+        // Check if current time is within the shift time
+        if ($currentTime < $shiftStart || $currentTime > $shiftEnd) {
+            return response()->json([
+                'success' => false,
+                'message' => "Check-in not allowed outside of shift hours ($shiftStart - $shiftEnd).",
+            ], 400);
+        }
+
+        // Check if a timesheet already exists for today
         $existingTimesheet = TimeSheet::where('company_id', $companyId)
             ->where('user_id', $employeeId)
             ->whereDate('check_in', $today)
             ->first();
-    
+
         if ($existingTimesheet) {
             return response()->json([
                 'success' => false,
                 'message' => 'Check-in for today already exists.',
-            ], 400); 
+            ], 400);
         }
-    
+
         try {
+            // Create new timesheet entry
             $newTimesheet = TimeSheet::create([
                 'company_id' => $companyId,
                 'user_id' => $employeeId,
                 'check_in' => now(),
             ]);
 
-            $currentTime = now()->format('h:iA');
             $message = "{$user->firstname} {$user->lastname} just checked in @ {$currentTime}";
-            
-            NotificationService::createNotification($message, $employeeId, null, $companyId );
-            
+
+            NotificationService::createNotification($message, $employeeId, null, $companyId);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Check-in created successfully.',
@@ -123,10 +159,11 @@ class TimeSheetController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $th->getMessage(),
-            ], 400); 
+            ], 400);
         }
-        
     }
+
+    
 
     // Check-out logic
     public function checkOut(Request $request)

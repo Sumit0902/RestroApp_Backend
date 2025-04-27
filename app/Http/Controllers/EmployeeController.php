@@ -101,16 +101,10 @@ class EmployeeController extends Controller
             'role' => 'sometimes|string|in:employee,manager',
             'company_role' => 'nullable|string|max:255',
             'wage' => 'nullable|string',
-            'wage_rate' => 'nullable|numeric',
-            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'wage_rate' => 'nullable|numeric|min:10.50', 
         ]);
 
-        if ($request->hasFile('avatar')) {
-            $file = $request->file('avatar');
-            $filename = time() . '.' . $file->getClientOriginalExtension();
-            $file->move(public_path('avatars'), $filename);
-            $validatedData['avatar'] = 'avatars/' . $filename;
-        }
+      
 
         if (isset($validatedData['password'])) {
             $validatedData['password'] = bcrypt($validatedData['password']);
