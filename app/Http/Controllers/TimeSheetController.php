@@ -175,7 +175,11 @@ class TimeSheetController extends Controller
 
             // Update the timesheet with the check-out time
             $timesheet->update(['check_out' => $currentTime]);
+            $user = User::where('id', $employeeId)->first();
+            $currentTime = now()->format('h:iA');
+            $message = "{$user->firstname} {$user->lastname} just checked out @ {$currentTime}";
 
+            NotificationService::createNotification($message, $employeeId, null, $companyId );
             return response()->json([
                 'success' => true,
                 'timesheet' => $timesheet,

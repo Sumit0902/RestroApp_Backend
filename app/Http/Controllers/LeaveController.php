@@ -82,7 +82,10 @@ class LeaveController extends Controller
                 'reason' => $request->reason,
                 'status' => 'pending',
             ]);
-            
+            $dateRange = ($request->start_date == $request->end_date) ? 'for '.$request->start_date : 'from '.$request->start_date . ' to ' . $request->end_date;
+            // $message = "Leave request from {$request->firstname} {$request->lastname} for {$dateRange} is pending";
+            $message = "{$request->firstname} {$request->lastname} just requested a leave  {$dateRange}";
+            NotificationService::createNotification($message, $userId, null, $companyId );
             return response()->json([
                 'success' => true,
                 'data' => $leave,

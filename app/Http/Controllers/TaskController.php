@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Task;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class TaskController extends Controller
 {
@@ -60,7 +62,8 @@ class TaskController extends Controller
             'user_id' => $validated['user_id'],
             'company_id' => $companyId,
         ));
-
+        $message = "You have a new task assigned to you: " . $task->name;
+        NotificationService::createNotification($message, null, $validated['user_id'], $companyId );
         return response()->json([
             'success' => true,
             'task' => $task,
@@ -69,24 +72,60 @@ class TaskController extends Controller
 
     public function update(Request $request, $companyId, $taskId)
     {
-        $request->validate([ 
+        $request->validate([
             'name' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'is_recurring' => 'nullable|boolean',
-            'weekdays' => 'nullable|array',
-            'weekdays.*' => 'integer|min:0|max:6',
+            'status' => 'nullable|string',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         $task = Task::where('id', $taskId)
             ->where('company_id', $companyId)
             ->firstOrFail();
 
+        // Store the original values before updating
+        $originalUserId = $task->user_id;
+
+        // Update the task with the new values
         $task->update($request->only([
-            // 'name',
-            // 'description',
-            // 'is_recurring',
+            'name',
+            'description',
             'status',
+            'user_id',
         ]));
+
+        // Check if the logged-in user is a manager
+        $loggedInUser = Auth::user();
+        $isManager = $loggedInUser->role === 'manager';
+
+        // Handle notifications based on the update
+        if ($isManager) {
+            if ($request->has('name') || $request->has('description')) {
+                // Notify the current user assigned to the task
+                $message = "The task you assigned has an update: " . $task->name;
+                NotificationService::createNotification($message, null, $task->user_id, $companyId);
+            }
+
+            if ($request->has('user_id') && $originalUserId != $task->user_id) {
+                // Notify the previous user
+                $prevUserMessage = "Your task has been assigned to someone else. Task name: " . $task->name;
+                NotificationService::createNotification($prevUserMessage, null, $originalUserId, $companyId);
+
+                // Notify the new user
+                $nextUserMessage = "You have been assigned a task: " . $task->name;
+                NotificationService::createNotification($nextUserMessage, null, $task->user_id, $companyId);
+            }
+        } 
+        else {
+            if($request->status  == 'completed'){
+                $message = "The task has been marked as completed: " . $task->name;
+                NotificationService::createNotification($message, $task->user_id, null, $companyId);
+            } 
+            else {
+                $nextUserMessage = "Task: " . $task->name. "has been updated.";
+                NotificationService::createNotification($nextUserMessage, $task->user_id, null, $companyId);
+            }
+        }
 
         return response()->json([
             'success' => true,

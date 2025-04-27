@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Company;
 use App\Models\Schedule;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 class ScheduleController extends Controller
@@ -108,6 +109,9 @@ class ScheduleController extends Controller
                         'days_schedule' => $carbonDate->toDateString(), // Store only the date as text
                         'notes' => $notes,
                     ]);
+
+                    $message = "A schedule has been created for you on " . $carbonDate->toDateString();
+                    NotificationService::createNotification($message, null, $employeeId, $companyId );
                 }
             }
 
